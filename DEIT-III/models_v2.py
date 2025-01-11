@@ -89,7 +89,7 @@ class Layer_scale_init_Block(nn.Module):
     def forward(self, x):
         x = x + self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
 
-        self.save_block = self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
+        self.attn_output = self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
 
         x = x + self.drop_path(self.gamma_2 * self.mlp(self.norm2(x)))
         return x
@@ -199,7 +199,7 @@ class vit_models(nn.Module):
         
         self.dropout_rate = drop_rate
 
-        self.save_attn = dict()
+        self.block_output = dict()
             
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim
@@ -269,11 +269,11 @@ class vit_models(nn.Module):
             
         for i , blk in enumerate(self.blocks):
             x = blk(x)
-            self.save_attn['block'+str(i)] = x
+            self.block_output['block'+str(i)] = x
 
             
         x = self.norm(x)
-        self.save_attn['final'] = x
+        self.block_output['final'] = x
         return x[:, 0]
 
     def forward(self, x):
