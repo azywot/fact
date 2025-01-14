@@ -1,5 +1,5 @@
 #model
-DINOV2/dinov2_vitl14_pretrained.pth
+DINOV2/dinov2_vitl14_pretrain.pth
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
