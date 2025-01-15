@@ -46,7 +46,7 @@ def get_args_parser():
     parser.add_argument('--drop-path', type=float, default=0.1, metavar='PCT',
                         help='Drop path rate (default: 0.1)')
 
-    parser.add_argument('--model-ema', action='store_true')
+    parser.add_argument('--model-ema', action='store_true') # TODO: what is it?
     parser.add_argument('--no-model-ema', action='store_false', dest='model_ema')
     parser.set_defaults(model_ema=True)
     parser.add_argument('--model-ema-decay', type=float, default=0.99996, help='')
@@ -146,16 +146,20 @@ def get_args_parser():
     parser.add_argument('--distillation-alpha', default=0.5, type=float, help="")
     parser.add_argument('--distillation-tau', default=1.0, type=float, help="")
     
-    # * Cosub params
+    # * Cosub params - NOTE: what is it?
     parser.add_argument('--cosub', action='store_true') 
     
     # * Finetuning params
     parser.add_argument('--finetune', default='', help='finetune from checkpoint')
     parser.add_argument('--attn-only', action='store_true') 
+
+    # TODO: Finetuning with registers
+    # parser.add_argument('--finetune-registers', action='store_true')
+    # parser.add_argument('--num-registers', type=int, default=1)
     
     # Dataset parameters
     parser.add_argument('--data-path', default='/datasets01/imagenet_full_size/061417/', type=str,
-                        help='dataset path')
+                        help='dataset path') # TODO: add imagenet subset
     parser.add_argument('--data-set', default='IMNET', choices=['CIFAR', 'IMNET', 'INAT', 'INAT19'],
                         type=str, help='Image Net dataset path')
     parser.add_argument('--inat-category', default='name',
@@ -173,7 +177,7 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
     parser.add_argument('--eval-crop-ratio', default=0.875, type=float, help="Crop ratio for evaluation")
     parser.add_argument('--dist-eval', action='store_true', default=False, help='Enabling distributed evaluation')
-    parser.add_argument('--num_workers', default=10, type=int)
+    parser.add_argument('--num_workers', default=10, type=int) # TODO: change to our capacity
     parser.add_argument('--pin-mem', action='store_true',
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
     parser.add_argument('--no-pin-mem', action='store_false', dest='pin_mem',
@@ -196,7 +200,9 @@ def main(args):
     if args.distillation_type != 'none' and args.finetune and not args.eval:
         raise NotImplementedError("Finetuning with distillation not yet supported")
 
-    device = torch.device(args.device)
+    # device = torch.device(args.device)
+    # NOTE: adjusted to be able to run locally
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
@@ -253,13 +259,15 @@ def main(args):
 
     mixup_fn = None
     mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
-    if mixup_active:
-        mixup_fn = Mixup(
-            mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
-            prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
-            label_smoothing=args.smoothing, num_classes=args.nb_classes)
+    # NOTE: mixup_fn not used
+    # if mixup_active:
+    #     mixup_fn = Mixup(
+    #         mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
+    #         prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
+    #         label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
     print(f"Creating model: {args.model}")
+    # TODO: load the pretrained model!
     model = create_model(
         args.model,
         pretrained=False,
@@ -356,16 +364,18 @@ def main(args):
 
     criterion = LabelSmoothingCrossEntropy()
 
-    if mixup_active:
-        # smoothing is handled with mixup label transform
-        criterion = SoftTargetCrossEntropy()
-    elif args.smoothing:
-        criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
-    else:
-        criterion = torch.nn.CrossEntropyLoss()
+    # NOTE: try with CrossEntropyLoss first
+    criterion = torch.nn.CrossEntropyLoss()
+    # if mixup_active:
+    #     # smoothing is handled with mixup label transform
+    #     criterion = SoftTargetCrossEntropy()
+    # elif args.smoothing:
+    #     criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
+    # else:
+    #     criterion = torch.nn.CrossEntropyLoss()
         
-    if args.bce_loss:
-        criterion = torch.nn.BCEWithLogitsLoss()
+    # if args.bce_loss:
+    #     criterion = torch.nn.BCEWithLogitsLoss()
         
     teacher_model = None
     if args.distillation_type != 'none':
