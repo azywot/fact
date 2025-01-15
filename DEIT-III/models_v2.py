@@ -240,10 +240,11 @@ class vit_models(nn.Module):
 
         # NOTE: whether the registers are used or not
         self.num_registers = num_registers
-        if num_registers > 0:
-            print(f"Adding {num_registers} register token(s) for fine-tuning.")
-            register_tokens = torch.nn.Parameter(torch.randn(num_registers, self.pos_embed.shape[-1]))
-            self.register_tokens = register_tokens
+    
+    def init_register_tokens(self):
+        if self.num_registers > 0:
+            print(f"Adding {self.num_registers} register token(s) for fine-tuning.")
+            self.register_tokens = torch.nn.Parameter(torch.randn(self.num_registers, self.pos_embed.shape[-1]))
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -323,6 +324,7 @@ def deit_tiny_patch16_LS_reg1(pretrained=False, img_size=224, pretrained_21k = F
         img_size = img_size, patch_size=16, embed_dim=192, depth=12, num_heads=3, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, num_registers=1, **kwargs) # NOTE: registers=1
     
+    model.init_register_tokens()
     return model
 
 @register_model
@@ -331,6 +333,7 @@ def deit_tiny_patch16_LS_reg4(pretrained=False, img_size=224, pretrained_21k = F
         img_size = img_size, patch_size=16, embed_dim=192, depth=12, num_heads=3, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, num_registers=4, **kwargs) # NOTE: registers=4
     
+    model.init_register_tokens()
     return model
     
 @register_model
@@ -352,6 +355,30 @@ def deit_small_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False
         )
         model.load_state_dict(checkpoint["model"])
 
+    return model
+
+# NOTE: does not work for now as the dataset was different (imgnet vs cifar) 
+@register_model
+def deit_small_patch16_LS_reg1(pretrained=True, img_size=224, pretrained_21k = False,  **kwargs):
+    model = vit_models(
+        img_size = img_size, patch_size=16, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, num_registers=1, **kwargs) # NOTE: registers=1
+    model.default_cfg = _cfg()
+    if True: # pretrained
+        print("PRETRAINED MODEL WILL BE USED!")
+        name = 'https://dl.fbaipublicfiles.com/deit/deit_3_small_'+str(img_size)+'_'
+        if pretrained_21k:
+            name+='21k.pth'
+        else:
+            name+='1k.pth'
+            
+        checkpoint = torch.hub.load_state_dict_from_url(
+            url=name,
+            map_location="cpu", check_hash=True
+        )
+        model.load_state_dict(checkpoint["model"])
+
+    model.init_register_tokens()
     return model
 
 @register_model
