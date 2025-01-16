@@ -344,9 +344,11 @@ def main(args):
             print('no patch embed')
 
     ####################################### F A C T #######################################
-    # TODO: double check if this is correct - by layers we mean blocks right? Also, we should probably freeze the embeddings (?)
     # freeze specified layers if pretrained and freeze_layers > 0
     if args.freeze_layers > 0: # and args.reg_use_pretrained:
+        for param in model.patch_embed.parameters():
+            param.requires_grad = False
+        print(">"*20, "Froze the patch embeddings.")
         num_blocks = len(model.blocks)
         freeze_until = min(args.freeze_layers, num_blocks)
         for block_idx in range(freeze_until):
