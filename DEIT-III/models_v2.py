@@ -242,6 +242,7 @@ class vit_models(nn.Module):
         self.num_registers = num_registers
     
     def init_register_tokens(self):
+        print(">"*20, f"NUMBER OF REGISTERS: {self.num_registers}")
         if self.num_registers > 0:
             print(f"Adding {self.num_registers} register token(s) for fine-tuning.")
             self.register_tokens = torch.nn.Parameter(torch.randn(self.num_registers, self.pos_embed.shape[-1]))
@@ -285,7 +286,7 @@ class vit_models(nn.Module):
    
         cls_tokens = self.cls_token.expand(B, -1, -1)
         
-        # NOTE: in the paper we have: [patches, cls, regs] but here [cls, patches, regs]
+        # NOTE: [FACT] in the paper we have: [patches, cls, regs] but here [cls, patches, regs]
         # TODO: double check whether it matters
         x = torch.cat((cls_tokens, x), dim=1) # shape: [batch_size, num_patches + num_registers + 1, embed_dim]
         
@@ -318,24 +319,17 @@ def deit_tiny_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False,
     
     return model
 
+####################################### F A C T #######################################
 @register_model
-def deit_tiny_patch16_LS_reg1(pretrained=False, img_size=224, pretrained_21k = False,   **kwargs):
+def deit_tiny_patch16_LS_reg(pretrained=False, img_size=224, pretrained_21k = False,   **kwargs):
     model = vit_models(
         img_size = img_size, patch_size=16, embed_dim=192, depth=12, num_heads=3, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, num_registers=1, **kwargs) # NOTE: registers=1
     
     model.init_register_tokens()
     return model
+#######################################################################################
 
-@register_model
-def deit_tiny_patch16_LS_reg4(pretrained=False, img_size=224, pretrained_21k = False,   **kwargs):
-    model = vit_models(
-        img_size = img_size, patch_size=16, embed_dim=192, depth=12, num_heads=3, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, num_registers=4, **kwargs) # NOTE: registers=4
-    
-    model.init_register_tokens()
-    return model
-    
 @register_model
 def deit_small_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
     model = vit_models(
@@ -357,15 +351,16 @@ def deit_small_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False
 
     return model
 
+####################################### F A C T #######################################
 # NOTE: does not work for now as the dataset was different (imgnet vs cifar) 
 @register_model
-def deit_small_patch16_LS_reg1(pretrained=True, img_size=224, pretrained_21k = False,  **kwargs):
+def deit_small_patch16_LS_reg(pretrained=True, img_size=224, pretrained_21k = False,  **kwargs):
     model = vit_models(
         img_size = img_size, patch_size=16, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4, qkv_bias=True,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, num_registers=1, **kwargs) # NOTE: registers=1
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, **kwargs)
     model.default_cfg = _cfg()
-    if True: # pretrained
-        print("PRETRAINED MODEL WILL BE USED!")
+    if pretrained:
+        print(">"*20, "PRETRAINED MODEL WILL BE USED")
         name = 'https://dl.fbaipublicfiles.com/deit/deit_3_small_'+str(img_size)+'_'
         if pretrained_21k:
             name+='21k.pth'
@@ -380,6 +375,7 @@ def deit_small_patch16_LS_reg1(pretrained=True, img_size=224, pretrained_21k = F
 
     model.init_register_tokens()
     return model
+#######################################################################################
 
 @register_model
 def deit_medium_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False, **kwargs):

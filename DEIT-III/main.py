@@ -146,7 +146,7 @@ def get_args_parser():
     parser.add_argument('--distillation-alpha', default=0.5, type=float, help="")
     parser.add_argument('--distillation-tau', default=1.0, type=float, help="")
     
-    # * Cosub params - NOTE: what is it?
+    # * Cosub params
     parser.add_argument('--cosub', action='store_true') 
     
     # * Finetuning params
@@ -154,8 +154,9 @@ def get_args_parser():
     parser.add_argument('--attn-only', action='store_true') 
 
     # TODO: Finetuning with registers
-    # parser.add_argument('--finetune-registers', action='store_true')
-    # parser.add_argument('--num-registers', type=int, default=1)
+    parser.add_argument('--reg-use-pretrained', action='store_true', help='use pretrained model for registers')
+    parser.add_argument('--num-registers', type=int, default=0, help='number of registers used')
+    parser.add_argument('--freeze-layers', type=int, default=0, help='freeze n first layers in a pre-trained model')
     
     # Dataset parameters
     parser.add_argument('--data-path', default='/datasets01/imagenet_full_size/061417/', type=str,
@@ -267,16 +268,17 @@ def main(args):
     #         label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
     print(f"Creating model: {args.model}")
-    # TODO: load the pretrained model!
     model = create_model(
         args.model,
-        pretrained=False,
+        pretrained=args.reg_use_pretrained, # NOTE: was originally set to False
         num_classes=args.nb_classes,
         drop_rate=args.drop,
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
-        img_size=args.input_size
+        img_size=args.input_size,
+        num_registers=args.num_registers,
     )
+    print(">"*20, "MODEL CREATED!")
 
                     
     if args.finetune:
@@ -314,7 +316,8 @@ def main(args):
         checkpoint_model['pos_embed'] = new_pos_embed
 
         model.load_state_dict(checkpoint_model, strict=False)
-        
+    
+    # NOTE: finetuning with attention only - maybe we should use it?    
     if args.attn_only:
         for name_p,p in model.named_parameters():
             if '.attn.' in name_p:
@@ -336,7 +339,19 @@ def main(args):
                 p.requires_grad = False
         except:
             print('no patch embed')
-            
+
+    ####################################### F A C T #######################################
+    # TODO: double check if this is correct - by layers we mean blocks right? Also, we should probably freeze the embeddings (?)
+    # freeze specified layers if pretrained and freeze_layers > 0
+    if args.freeze_layers > 0: # and args.reg_use_pretrained:
+        num_blocks = len(model.blocks)
+        freeze_until = min(args.freeze_layers, num_blocks)
+        for block_idx in range(freeze_until):
+            for param in model.blocks[block_idx].parameters():
+                param.requires_grad = False
+        print(">"*20, f"Froze {freeze_until} out of {num_blocks} layers of the model.")
+    ######################################################################################
+
     model.to(device)
 
     model_ema = None
