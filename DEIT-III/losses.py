@@ -40,6 +40,7 @@ class DistillationLoss(torch.nn.Module):
         print("## labels: ", labels.shape) 
         base_loss = self.base_criterion(outputs, labels)
         if self.distillation_type == 'none':
+            print(">"*20, "Loss used:", self.base_criterion.__class__.__name__)
             return base_loss
 
         if outputs_kd is None:

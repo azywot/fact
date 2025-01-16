@@ -157,6 +157,7 @@ def get_args_parser():
     parser.add_argument('--reg-use-pretrained', action='store_true', help='use pretrained model for registers')
     parser.add_argument('--num-registers', type=int, default=0, help='number of registers used')
     parser.add_argument('--freeze-layers', type=int, default=0, help='freeze n first layers in a pre-trained model')
+    parser.add_argument('--l2-weight', type=float, default=0.0, help='L2 regularization weight') # TODO
     
     # Dataset parameters
     parser.add_argument('--data-path', default='/datasets01/imagenet_full_size/061417/', type=str,

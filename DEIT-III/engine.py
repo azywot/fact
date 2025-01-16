@@ -54,6 +54,24 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 loss = loss + 0.25 * criterion(outputs[0], outputs[1].detach().sigmoid())
                 loss = loss + 0.25 * criterion(outputs[1], outputs[0].detach().sigmoid()) 
 
+        ####################################### F A C T #######################################
+        if args.l2_weight > 0:
+
+            # #### Stolen from Alessio's notebook
+            # ## Norm of feature values after MLP
+            # output = test_model.block_output['final']
+            # output = output.squeeze(0)
+            # output = output[1:]
+            # #output.shape
+            # # copmute norm of all output elements
+            # output_norms = output.norm(dim=-1)
+            # #output_norms.shape
+
+            l2_loss = 0
+            output_norms = output.norm(dim=-1) # TODO: wrap it up based on ipynb
+            loss += args.l2_weight * l2_loss
+        ######################################################################################
+
         loss_value = loss.item()
 
         if not math.isfinite(loss_value):
