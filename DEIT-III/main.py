@@ -170,8 +170,8 @@ def get_args_parser():
                         choices=['kingdom', 'phylum', 'class', 'order', 'supercategory', 'family', 'genus', 'name'],
                         type=str, help='semantic granularity')
 
-    parser.add_argument('--output_dir', default='',
-                        help='path where to save, empty for no saving')
+    parser.add_argument('--output_dir', default=f'{datetime.now().strftime('%d_%m_%Y_%H_%M')}',
+                        help='path where to save, current date and time in DD_MM_RRRR_HH_MM set as default')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=0, type=int)
@@ -423,6 +423,9 @@ def main(args):
     )
 
     output_dir = Path(args.output_dir)
+    # make dir if iot does not exist
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     if args.resume:
         if args.resume.startswith('https'):
             checkpoint = torch.hub.load_state_dict_from_url(
