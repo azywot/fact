@@ -170,7 +170,7 @@ def get_args_parser():
                         choices=['kingdom', 'phylum', 'class', 'order', 'supercategory', 'family', 'genus', 'name'],
                         type=str, help='semantic granularity')
 
-    parser.add_argument('--output_dir', default=f'{datetime.now().strftime('%d_%m_%Y_%H_%M')}',
+    parser.add_argument('--output_dir', default=f'{datetime.datetime.now().strftime('%d_%m_%Y_%H_%M')}',
                         help='path where to save, current date and time in DD_MM_RRRR_HH_MM set as default')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
