@@ -277,12 +277,12 @@ class vit_models(nn.Module):
 
         if self.num_registers > 0:
             registers = repeat(self.register_tokens, 'n d -> b n d', b=B).to(x.device)
-            print("forward_with_registers!")
-            print("patches: ", x.shape)
-            print("registers: ", registers.shape)
+            # print("forward_with_registers!")
+            # print("patches: ", x.shape)
+            # print("registers: ", registers.shape)
 
             x = torch.cat([x, registers], dim=1) # shape: [batch_size, num_patches + num_registers, embed_dim]
-            print("x_with_registers: ", x.shape)
+            # print("x_with_registers: ", x.shape)
    
         cls_tokens = self.cls_token.expand(B, -1, -1)
         
@@ -296,7 +296,7 @@ class vit_models(nn.Module):
             
         x = self.norm(x) 
         self.block_output['final'] = x
-        print("final shape:", x.shape)
+        # print("final shape:", x.shape)
         return x[:, -1] # take only cls 
 
     def forward(self, x):
