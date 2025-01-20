@@ -286,9 +286,9 @@ class vit_models(nn.Module):
    
         cls_tokens = self.cls_token.expand(B, -1, -1)
         
-        # NOTE: [FACT] in the paper we have: [patches, cls, regs] but here [patches, regs, cls]
+        # NOTE: [FACT] in the paper we have: [patches, cls, regs] but here [cls, patches, regs]
         # TODO: double check whether it matters
-        x = torch.cat((x, cls_tokens), dim=1) # shape: [batch_size, num_patches + num_registers + 1, embed_dim]
+        x = torch.cat((cls_tokens, x), dim=1) # shape: [batch_size, num_patches + num_registers + 1, embed_dim]
         
         for i , blk in enumerate(self.blocks):
             x = blk(x)
@@ -297,7 +297,7 @@ class vit_models(nn.Module):
         x = self.norm(x) 
         self.block_output['final'] = x
         # print("final shape:", x.shape)
-        return x[:, -1] # take only cls 
+        return x[:, 0] # take only cls 
 
     def forward(self, x):
         # TODO: double check whether it is correct
@@ -339,8 +339,10 @@ def deit_small_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False
     if pretrained:
         name = 'https://dl.fbaipublicfiles.com/deit/deit_3_small_'+str(img_size)+'_'
         if pretrained_21k:
+            print("*"*20, "PRETRAINED 21k MODEL WILL BE USED")
             name+='21k.pth'
         else:
+            print("*"*20, "PRETRAINED 1k MODEL WILL BE USED")
             name+='1k.pth'
             
         checkpoint = torch.hub.load_state_dict_from_url(

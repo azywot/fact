@@ -156,6 +156,8 @@ def get_args_parser():
     ####################################### F A C T #######################################
     # Finetuning with registers
     parser.add_argument('--reg-use-pretrained', action='store_true', help='use pretrained model for registers')
+    # store it as true by default
+    parser.add_argument('--pretrained-21k', action='store_true', help='use pretrained imgnet21k model')
     parser.add_argument('--num-registers', type=int, default=0, help='number of registers used')
     parser.add_argument('--freeze-layers', type=int, default=0, help='freeze n first layers in a pre-trained model')
     parser.add_argument('--l2-weight', type=float, default=0.0, help='L2 regularization weight')
@@ -207,6 +209,7 @@ def main(args):
     # device = torch.device(args.device)
     # NOTE: adjusted to be able to run locally
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("*"*20, f"Device: {device}")
 
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
@@ -274,6 +277,7 @@ def main(args):
     model = create_model(
         args.model,
         pretrained=args.reg_use_pretrained, # NOTE: was originally set to False
+        pretrained_21k = args.pretrained_21k,
         num_classes=args.nb_classes,
         drop_rate=args.drop,
         drop_path_rate=args.drop_path,
