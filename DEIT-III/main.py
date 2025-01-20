@@ -46,7 +46,7 @@ def get_args_parser():
     parser.add_argument('--drop-path', type=float, default=0.1, metavar='PCT',
                         help='Drop path rate (default: 0.1)')
 
-    parser.add_argument('--model-ema', action='store_true')
+    parser.add_argument('--model-ema', action='store_true') # TODO: what is it?
     parser.add_argument('--no-model-ema', action='store_false', dest='model_ema')
     parser.set_defaults(model_ema=True)
     parser.add_argument('--model-ema-decay', type=float, default=0.99996, help='')
@@ -152,18 +152,26 @@ def get_args_parser():
     # * Finetuning params
     parser.add_argument('--finetune', default='', help='finetune from checkpoint')
     parser.add_argument('--attn-only', action='store_true') 
+
+    ####################################### F A C T #######################################
+    # Finetuning with registers
+    parser.add_argument('--reg-use-pretrained', action='store_true', help='use pretrained model for registers')
+    parser.add_argument('--num-registers', type=int, default=0, help='number of registers used')
+    parser.add_argument('--freeze-layers', type=int, default=0, help='freeze n first layers in a pre-trained model')
+    parser.add_argument('--l2-weight', type=float, default=0.0, help='L2 regularization weight')
+    ######################################################################################
     
     # Dataset parameters
     parser.add_argument('--data-path', default='/datasets01/imagenet_full_size/061417/', type=str,
-                        help='dataset path')
+                        help='dataset path') # TODO: add imagenet subset
     parser.add_argument('--data-set', default='IMNET', choices=['CIFAR', 'IMNET', 'INAT', 'INAT19'],
                         type=str, help='Image Net dataset path')
     parser.add_argument('--inat-category', default='name',
                         choices=['kingdom', 'phylum', 'class', 'order', 'supercategory', 'family', 'genus', 'name'],
                         type=str, help='semantic granularity')
 
-    parser.add_argument('--output_dir', default='',
-                        help='path where to save, empty for no saving')
+    parser.add_argument('--output_dir', default=f'{datetime.datetime.now().strftime('%d_%m_%Y_%H_%M')}',
+                        help='path where to save, current date and time in DD_MM_RRRR_HH_MM set as default')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
     parser.add_argument('--seed', default=0, type=int)
@@ -173,7 +181,7 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
     parser.add_argument('--eval-crop-ratio', default=0.875, type=float, help="Crop ratio for evaluation")
     parser.add_argument('--dist-eval', action='store_true', default=False, help='Enabling distributed evaluation')
-    parser.add_argument('--num_workers', default=10, type=int)
+    parser.add_argument('--num_workers', default=0, type=int) # NOTE: changed from 10 to 0
     parser.add_argument('--pin-mem', action='store_true',
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
     parser.add_argument('--no-pin-mem', action='store_false', dest='pin_mem',
@@ -196,7 +204,9 @@ def main(args):
     if args.distillation_type != 'none' and args.finetune and not args.eval:
         raise NotImplementedError("Finetuning with distillation not yet supported")
 
-    device = torch.device(args.device)
+    # device = torch.device(args.device)
+    # NOTE: adjusted to be able to run locally
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
@@ -253,22 +263,25 @@ def main(args):
 
     mixup_fn = None
     mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
-    if mixup_active:
-        mixup_fn = Mixup(
-            mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
-            prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
-            label_smoothing=args.smoothing, num_classes=args.nb_classes)
+    # NOTE: mixup_fn not used
+    # if mixup_active:
+    #     mixup_fn = Mixup(
+    #         mixup_alpha=args.mixup, cutmix_alpha=args.cutmix, cutmix_minmax=args.cutmix_minmax,
+    #         prob=args.mixup_prob, switch_prob=args.mixup_switch_prob, mode=args.mixup_mode,
+    #         label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
     print(f"Creating model: {args.model}")
     model = create_model(
         args.model,
-        pretrained=False,
+        pretrained=args.reg_use_pretrained, # NOTE: was originally set to False
         num_classes=args.nb_classes,
         drop_rate=args.drop,
         drop_path_rate=args.drop_path,
         drop_block_rate=None,
-        img_size=args.input_size
+        img_size=args.input_size,
+        num_registers=args.num_registers,
     )
+    print(">"*20, "MODEL CREATED!")
 
                     
     if args.finetune:
@@ -306,7 +319,8 @@ def main(args):
         checkpoint_model['pos_embed'] = new_pos_embed
 
         model.load_state_dict(checkpoint_model, strict=False)
-        
+    
+    # NOTE: finetuning with attention only - maybe we should use it?    
     if args.attn_only:
         for name_p,p in model.named_parameters():
             if '.attn.' in name_p:
@@ -328,7 +342,21 @@ def main(args):
                 p.requires_grad = False
         except:
             print('no patch embed')
-            
+
+    ####################################### F A C T #######################################
+    # freeze specified layers if pretrained and freeze_layers > 0
+    if args.freeze_layers > 0: # and args.reg_use_pretrained:
+        for param in model.patch_embed.parameters():
+            param.requires_grad = False
+        print(">"*20, "Froze the patch embeddings.")
+        num_blocks = len(model.blocks)
+        freeze_until = min(args.freeze_layers, num_blocks)
+        for block_idx in range(freeze_until):
+            for param in model.blocks[block_idx].parameters():
+                param.requires_grad = False
+        print(">"*20, f"Froze {freeze_until} out of {num_blocks} layers of the model.")
+    ######################################################################################
+
     model.to(device)
 
     model_ema = None
@@ -356,16 +384,18 @@ def main(args):
 
     criterion = LabelSmoothingCrossEntropy()
 
-    if mixup_active:
-        # smoothing is handled with mixup label transform
-        criterion = SoftTargetCrossEntropy()
-    elif args.smoothing:
-        criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
-    else:
-        criterion = torch.nn.CrossEntropyLoss()
+    # NOTE: try with CrossEntropyLoss first
+    criterion = torch.nn.CrossEntropyLoss()
+    # if mixup_active:
+    #     # smoothing is handled with mixup label transform
+    #     criterion = SoftTargetCrossEntropy()
+    # elif args.smoothing:
+    #     criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
+    # else:
+    #     criterion = torch.nn.CrossEntropyLoss()
         
-    if args.bce_loss:
-        criterion = torch.nn.BCEWithLogitsLoss()
+    # if args.bce_loss:
+    #     criterion = torch.nn.BCEWithLogitsLoss()
         
     teacher_model = None
     if args.distillation_type != 'none':
@@ -393,6 +423,9 @@ def main(args):
     )
 
     output_dir = Path(args.output_dir)
+    # make dir if iot does not exist
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     if args.resume:
         if args.resume.startswith('https'):
             checkpoint = torch.hub.load_state_dict_from_url(

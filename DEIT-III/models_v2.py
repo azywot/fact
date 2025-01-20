@@ -7,8 +7,10 @@ from functools import partial
 
 from timm.models.vision_transformer import Mlp, PatchEmbed , _cfg
 
-from timm.layers import DropPath, to_2tuple, trunc_normal_
+from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from timm.models import register_model
+# import repeat (add registers)
+from einops import repeat
 
 class Attention(nn.Module):
     # taken from https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/vision_transformer.py
@@ -197,7 +199,8 @@ class vit_models(nn.Module):
                  Patch_layer=PatchEmbed,act_layer=nn.GELU,
                  Attention_block = Attention, Mlp_block=Mlp,
                 dpr_constant=True,init_scale=1e-4,
-                mlp_ratio_clstk = 4.0,**kwargs):
+                mlp_ratio_clstk = 4.0,
+                num_registers=0, **kwargs): # no registers by default
         super().__init__()
         
         self.dropout_rate = drop_rate
@@ -235,6 +238,15 @@ class vit_models(nn.Module):
         trunc_normal_(self.cls_token, std=.02)
         self.apply(self._init_weights)
 
+        # NOTE: whether the registers are used or not
+        self.num_registers = num_registers
+    
+    def init_register_tokens(self):
+        print(">"*20, f"NUMBER OF REGISTERS: {self.num_registers}")
+        if self.num_registers > 0:
+            print(f"Adding {self.num_registers} register token(s) for fine-tuning.")
+            self.register_tokens = torch.nn.Parameter(torch.randn(self.num_registers, self.pos_embed.shape[-1]))
+
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             trunc_normal_(m.weight, std=.02)
@@ -259,28 +271,36 @@ class vit_models(nn.Module):
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
     def forward_features(self, x):
-        B = x.shape[0]
-        x = self.patch_embed(x)
+        B = x.shape[0]  # batch size
+        x = self.patch_embed(x)   # shape: [batch_size, num_patches, embed_dim]
+        x = x + self.pos_embed
 
+        if self.num_registers > 0:
+            registers = repeat(self.register_tokens, 'n d -> b n d', b=B).to(x.device)
+            # print("forward_with_registers!")
+            # print("patches: ", x.shape)
+            # print("registers: ", registers.shape)
+
+            x = torch.cat([x, registers], dim=1) # shape: [batch_size, num_patches + num_registers, embed_dim]
+            # print("x_with_registers: ", x.shape)
+   
         cls_tokens = self.cls_token.expand(B, -1, -1)
         
-        x = x + self.pos_embed
+        # NOTE: [FACT] in the paper we have: [patches, cls, regs] but here [patches, regs, cls]
+        # TODO: double check whether it matters
+        x = torch.cat((x, cls_tokens), dim=1) # shape: [batch_size, num_patches + num_registers + 1, embed_dim]
         
-        x = torch.cat((cls_tokens, x), dim=1)
-
-        
-            
         for i , blk in enumerate(self.blocks):
             x = blk(x)
             self.block_output['block'+str(i)] = x
-
             
-        x = self.norm(x)
+        x = self.norm(x) 
         self.block_output['final'] = x
-        return x[:, 0]
+        # print("final shape:", x.shape)
+        return x[:, -1] # take only cls 
 
     def forward(self, x):
-
+        # TODO: double check whether it is correct
         x = self.forward_features(x)
         
         if self.dropout_rate:
@@ -298,8 +318,18 @@ def deit_tiny_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, **kwargs)
     
     return model
+
+####################################### F A C T #######################################
+@register_model
+def deit_tiny_patch16_LS_reg(pretrained=False, img_size=224, pretrained_21k = False,   **kwargs):
+    model = vit_models(
+        img_size = img_size, patch_size=16, embed_dim=192, depth=12, num_heads=3, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, num_registers=1, **kwargs) # NOTE: registers=1
     
-    
+    model.init_register_tokens()
+    return model
+#######################################################################################
+
 @register_model
 def deit_small_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False,  **kwargs):
     model = vit_models(
@@ -320,6 +350,32 @@ def deit_small_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False
         model.load_state_dict(checkpoint["model"])
 
     return model
+
+####################################### F A C T #######################################
+# NOTE: does not work for now as the dataset was different (imgnet vs cifar) 
+@register_model
+def deit_small_patch16_LS_reg(pretrained=True, img_size=224, pretrained_21k = False,  **kwargs):
+    model = vit_models(
+        img_size = img_size, patch_size=16, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),block_layers=Layer_scale_init_Block, **kwargs)
+    model.default_cfg = _cfg()
+    if pretrained:
+        print(">"*20, "PRETRAINED MODEL WILL BE USED")
+        name = 'https://dl.fbaipublicfiles.com/deit/deit_3_small_'+str(img_size)+'_'
+        if pretrained_21k:
+            name+='21k.pth'
+        else:
+            name+='1k.pth'
+            
+        checkpoint = torch.hub.load_state_dict_from_url(
+            url=name,
+            map_location="cpu", check_hash=True
+        )
+        model.load_state_dict(checkpoint["model"])
+
+    model.init_register_tokens()
+    return model
+#######################################################################################
 
 @register_model
 def deit_medium_patch16_LS(pretrained=False, img_size=224, pretrained_21k = False, **kwargs):

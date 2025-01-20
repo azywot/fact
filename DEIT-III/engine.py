@@ -54,6 +54,24 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 loss = loss + 0.25 * criterion(outputs[0], outputs[1].detach().sigmoid())
                 loss = loss + 0.25 * criterion(outputs[1], outputs[0].detach().sigmoid()) 
 
+        ####################################### F A C T #######################################
+        if args.l2_weight > 0:
+
+            # take the l2-norm from the last layer
+            # [patches, regs, cls]
+            discard_tokens = args.num_registers + 1
+            # not that neat but works both locally and on the cluster
+            try:
+                final_output = model.module.block_output['final'][:, :-discard_tokens]
+            except:
+                final_output = model.block_output['final'][:, :-discard_tokens]
+            output_norms = final_output.norm(dim=-1)
+            l2_norm_loss = args.l2_weight * output_norms.mean()
+            print("*"*20, "Cross-entropy loss: ", loss.item())
+            print("*"*20, "L2-norm loss: ", l2_norm_loss.item())
+            loss = loss + l2_norm_loss
+
+        ######################################################################################
         loss_value = loss.item()
 
         if not math.isfinite(loss_value):
@@ -67,7 +85,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         loss_scaler(loss, optimizer, clip_grad=max_norm,
                     parameters=model.parameters(), create_graph=is_second_order)
 
-        torch.cuda.synchronize()
+        # only if cuda is available
+        if device == torch.device('cuda'):
+            torch.cuda.synchronize()
         if model_ema is not None:
             model_ema.update(model)
 
