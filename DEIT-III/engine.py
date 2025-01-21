@@ -62,9 +62,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
             discard_tokens = args.num_registers
             # not that neat but works both locally and on the cluster
             try:
-                final_output = model.module.block_output['final'][:, 1:-discard_tokens]
+                num_blocks = model.module.get_num_layers()-1
+                final_output = model.module.block_output[f"block{num_blocks}"][:, 1:-discard_tokens]
+                # final_output = model.module.block_output['final'][:, 1:-discard_tokens]
             except:
-                final_output = model.block_output['final'][:, 1:-discard_tokens]
+                num_blocks = model.get_num_layers()-1
+                final_output = model.block_output[f"block{num_blocks}"][:, 1:-discard_tokens]
+                # final_output = model.block_output['final'][:, 1:-discard_tokens]
             output_norms = final_output.norm(dim=-1)
             l2_norm_loss = args.l2_weight * output_norms.mean()
             print("*"*20, "Cross-entropy loss: ", loss.item())
