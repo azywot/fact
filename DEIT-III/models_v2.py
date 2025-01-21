@@ -308,6 +308,31 @@ class vit_models(nn.Module):
         x = self.head(x)
         
         return x
+    
+    def load_pretrained_state_dict(self, state_dict, strict=True):
+        """
+        Load a pretrained state dictionary, including register tokens if applicable.
+        """
+        # check if the fine-tuned state_dict contains register tokens
+        if "register_tokens" in state_dict:
+            num_registers, _ = state_dict["register_tokens"].shape
+            self.num_registers = num_registers
+
+            if num_registers > 0:
+                print(f"Loading {num_registers} register tokens.")
+                # load the register tokens from the state_dict
+                self.register_tokens = nn.Parameter(state_dict["register_tokens"])
+            else:
+                print("Ignoring 'register_tokens' in state_dict as the model does not use registers.")
+                state_dict.pop("register_tokens")
+        else:
+            if self.num_registers > 0:
+                print(f"Initializing {self.num_registers} new register tokens as none were found in state_dict.")
+                register_shape = (self.num_registers, self.pos_embed.shape[-1])
+                self.register_tokens = nn.Parameter(torch.randn(register_shape))
+
+        # load the rest of the state_dict
+        self.load_state_dict(state_dict, strict=strict)
 
 # DeiT III: Revenge of the ViT (https://arxiv.org/abs/2204.07118)
 
