@@ -38,6 +38,7 @@ def show_artifacts(
         registers = output_norms[-discard_tokens:]
         output_norms = output_norms[1:-discard_tokens]
     else:
+        cls = output_norms[0]
         output_norms = output_norms[1:]
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -46,7 +47,8 @@ def show_artifacts(
     plt.colorbar(label="Norm Values")  # add a colorbar as a legend
     plt.show()
 
-    print("Norm of register tokens: ", [round(float(x), 3) for x in registers.detach().numpy()])
+    if discard_tokens > 0:
+        print("Norm of register tokens: ", [round(float(x), 3) for x in registers.detach().numpy()])
     print('Norm of CLS token: ', (cls.detach().numpy()))
 
     plt.hist(output_norms.detach().numpy(), bins=50)
@@ -136,11 +138,12 @@ def show_artifacts(
             output_cls = output[0]
             output_reg = output[-discard_tokens:]
             output = output[1:-discard_tokens]
+            output_norms_reg.append(output_reg.norm(dim=-1))
         else:
             output_cls = output[0]
             output = output[1:]
         output_norms_cls = output_cls.norm(dim=-1)
-        output_norms_reg.append(output_reg.norm(dim=-1))
+        
         output_norms = output.norm(dim=-1)
         output_norms_img = output_norms.reshape(shape[0], shape[1]).detach().numpy()
 
