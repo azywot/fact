@@ -1,3 +1,11 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
+import torch
+import torch.nn as nn
+import numpy as np
+from PIL import Image
+from matplotlib.colors import LogNorm
+
 def show_artifacts(
     test_model: nn.Module, test_image: torch.Tensor, log_scale=False, token: int = 0, shape: tuple = (24, 24), discard_tokens: int = 4
 ) -> None:
@@ -109,6 +117,7 @@ def plot_image(image_tensor: torch.Tensor) -> None:
 
 
 def plot_feature_norms_with_high_attn(
+    chosen_model: nn.Module,
     output_tensor: torch.Tensor,
     high_attn_tokens: torch.Tensor,
     grid_size: tuple = (24, 24),
@@ -263,3 +272,19 @@ def plot_norm_proportions(
     plt.title("Proportion of Norms Across Layers", fontsize=16)
     plt.tight_layout()
     plt.show()
+
+
+def norm_per_layer(chosen_model, discard_tokens = 4):
+    layer_norms = []
+    for x in range(12):
+        layer_norms.append(torch.log(chosen_model.block_output['block'+ str(x)].squeeze()[1:-discard_tokens,:].norm(dim = -1) + 1e-6).detach().numpy())
+        # layer_norms.append(chosen_model.block_output['block'+ str(x)].squeeze()[1:,:].norm(dim = -1).detach().numpy())
+
+
+    plt.figure(figsize=(12, 8))  # Adjust the width and height as needed
+    for i, norms in enumerate(layer_norms):
+        plt.scatter([i] * len(norms), norms, alpha=0.5)
+    plt.xlabel("Layer")
+    plt.ylabel("Norm Values")
+    plt.show()
+    return layer_norms
