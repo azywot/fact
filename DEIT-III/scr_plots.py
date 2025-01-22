@@ -295,7 +295,7 @@ def plot_norm_proportions(
     plt.show()
 
 
-def norm_per_layer(chosen_model, discard_tokens = 0):
+def norm_per_layer(chosen_model: nn.Module, discard_tokens: int = 0) -> list:
     layer_norms = []
     for x in range(12):
         if discard_tokens > 0:
