@@ -274,13 +274,16 @@ def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tu
             
         elif str(token) == "reg":
             for j in range(1, discard_tokens + 1):
-                show_attn_progression(test_model, token= - 1 -j, grid_size=grid_size, discard_tokens=4)
+                plt.close(fig)
+                show_attn_progression(test_model, token= - 1 - j, grid_size=grid_size, discard_tokens=discard_tokens)
+            return
 
         else:
             if discard_tokens > 0:
                 attn_map = attn_map[token + 1][1:-discard_tokens]
             else:
                 attn_map = attn_map[token + 1][1:]
+        
         attn_map_img = attn_map.reshape(grid_size).detach().numpy()
 
         axes[i].imshow(attn_map_img)
