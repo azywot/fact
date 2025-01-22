@@ -7,7 +7,7 @@ from PIL import Image
 from matplotlib.colors import LogNorm
 
 def show_artifacts(
-    test_model: nn.Module, test_image: torch.Tensor, log_scale=False, token: int = 0, shape: tuple = (24, 24), discard_tokens: int = 4
+    test_model: nn.Module, test_image: torch.Tensor, log_scale=False, token: int = 0, shape: tuple = (24, 24), discard_tokens: int = 0
 ) -> None:
     """
     Generate the Attention maps and the norm values for the DEIT-III model
@@ -33,8 +33,10 @@ def show_artifacts(
     # TODO: double check
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #discard_tokens = 4 # discard the CLS token and 4 register tokens
-
-    output_norms = output_norms[1:-discard_tokens]
+    if discard_tokens > 0:
+        output_norms = output_norms[1:-discard_tokens]
+    else:
+        output_norms = output_norms[1:]
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     plt.imshow(output_norms.reshape(shape[0], shape[1]).detach().numpy())
@@ -54,7 +56,10 @@ def show_artifacts(
         test_model.blocks[num_blocks - 1].attn.attn_map.squeeze(0).mean(dim=0)
     )
     ### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    attn_map_mean = attn_map_mean[token][1:-discard_tokens]
+    if discard_tokens > 0:
+        attn_map_mean = attn_map_mean[token][1:-discard_tokens]
+    else:
+        attn_map_mean = attn_map_mean[token][1:]
     if log_scale:
         attn_map_mean = torch.log(attn_map_mean + 1e-6)
     # attn_map_mean.shape
@@ -78,7 +83,10 @@ def show_artifacts(
     for i in range(num_blocks):
         attn_map = test_model.blocks[i].attn.attn_map.squeeze(0).mean(dim=0)
         # attn_map = attn_map[token][1:] # !!!!!!!!!!!
-        attn_map = attn_map[token][1:-discard_tokens]
+        if discard_tokens > 0:
+            attn_map = attn_map[token][1:-discard_tokens]
+        else:
+            attn_map = attn_map[token][1:]
         attn_map_img = attn_map.reshape(shape[0], shape[1]).detach().numpy()
 
         axes[i].imshow(attn_map_img)
@@ -124,7 +132,7 @@ def plot_feature_norms_with_high_attn(
     dot_color: str = "red",
     dot_size: int = 30,
     label: str = "High Attention Tokens",
-    discard_tokens: int = 4,
+    discard_tokens: int = 0,
 ) -> None:
     """
     Plots the norm of feature values from a model's MLP output, with red dots indicating high attention tokens.
@@ -136,7 +144,10 @@ def plot_feature_norms_with_high_attn(
     :param dot_size: The size of the high attention points
     """
     # squeeze and remove the CLS token
-    output = output_tensor.squeeze(0)[1:-discard_tokens]
+    if discard_tokens > 0:
+        output = output_tensor.squeeze(0)[1:-discard_tokens]
+    else:
+        output = output_tensor.squeeze(0)[1:]
     # compute norm of all output elements
     output_norms = output.norm(dim=-1)
 
@@ -160,7 +171,10 @@ def plot_feature_norms_with_high_attn(
     # plot the attention map next to it
     plt.subplot(1, 2, 2)
     attn_map = chosen_model.blocks[-1].attn.attn_map.squeeze(0).mean(dim=0)
-    attn_map = attn_map[0][1:-discard_tokens].reshape(grid_size).detach().numpy()
+    if discard_tokens > 0:
+        attn_map = attn_map[0][1:-discard_tokens].reshape(grid_size).detach().numpy()
+    else:
+        attn_map = attn_map[0][1:].reshape(grid_size).detach().numpy()
     plt.imshow(attn_map)
     plt.axis("off")
     plt.colorbar(label="Attention Map")
@@ -172,7 +186,7 @@ def plot_feature_norms_with_high_attn(
     plt.show()
 
 
-def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tuple = (24, 24), discard_tokens: int=4) -> None:
+def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tuple = (24, 24), discard_tokens: int=0) -> None:
 
     ## All attention maps
     num_images = len(test_model.blocks)
@@ -187,13 +201,20 @@ def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tu
     for i in range(num_images):
         attn_map = test_model.blocks[i].attn.attn_map.squeeze(0).mean(dim=0)
         if str(token) == "cls":
-            attn_map = attn_map[0][1:-discard_tokens]
+            if discard_tokens > 0:
+                attn_map = attn_map[0][1:-discard_tokens]
+            else:
+                attn_map = attn_map[0][1:]
+            
         elif str(token) == "reg":
             for j in range(1, discard_tokens + 1):
                 show_attn_progression(test_model, token= - 1 -j, grid_size=grid_size, discard_tokens=4)
 
         else:
-            attn_map = attn_map[token + 1][1:-discard_tokens]
+            if discard_tokens > 0:
+                attn_map = attn_map[token + 1][1:-discard_tokens]
+            else:
+                attn_map = attn_map[token + 1][1:]
         attn_map_img = attn_map.reshape(grid_size).detach().numpy()
 
         axes[i].imshow(attn_map_img)
@@ -274,10 +295,13 @@ def plot_norm_proportions(
     plt.show()
 
 
-def norm_per_layer(chosen_model, discard_tokens = 4):
+def norm_per_layer(chosen_model, discard_tokens = 0):
     layer_norms = []
     for x in range(12):
-        layer_norms.append(torch.log(chosen_model.block_output['block'+ str(x)].squeeze()[1:-discard_tokens,:].norm(dim = -1) + 1e-6).detach().numpy())
+        if discard_tokens > 0:
+            layer_norms.append(torch.log(chosen_model.block_output['block'+ str(x)].squeeze()[1:-discard_tokens,:].norm(dim = -1) + 1e-6).detach().numpy())
+        else:
+            layer_norms.append(torch.log(chosen_model.block_output['block'+ str(x)].squeeze()[1:,:].norm(dim = -1) + 1e-6).detach().numpy())
         # layer_norms.append(chosen_model.block_output['block'+ str(x)].squeeze()[1:,:].norm(dim = -1).detach().numpy())
 
 
