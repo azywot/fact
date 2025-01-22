@@ -7,7 +7,7 @@ from PIL import Image
 from matplotlib.colors import LogNorm
 
 def show_artifacts(
-    test_model: nn.Module, test_image: torch.Tensor, log_scale=False, token: int = 0, shape: tuple = (24, 24), discard_tokens: int = 0
+    test_model: nn.Module, test_image: torch.Tensor, log_scale=False, token: int = 0, shape: tuple = (24, 24), discard_tokens: int = 0, num_cols: int = 4, unfrozen_layers: int = 0
 ) -> None:
     """
     Generate the Attention maps and the norm values for the DEIT-III model
@@ -34,6 +34,8 @@ def show_artifacts(
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #discard_tokens = 4 # discard the CLS token and 4 register tokens
     if discard_tokens > 0:
+        cls = output_norms[0]
+        registers = output_norms[-discard_tokens:]
         output_norms = output_norms[1:-discard_tokens]
     else:
         output_norms = output_norms[1:]
@@ -44,54 +46,64 @@ def show_artifacts(
     plt.colorbar(label="Norm Values")  # add a colorbar as a legend
     plt.show()
 
+    print("Norm of register tokens: ", [round(float(x), 3) for x in registers.detach().numpy()])
+    print('Norm of CLS token: ', (cls.detach().numpy()))
+
     plt.hist(output_norms.detach().numpy(), bins=50)
     plt.xlabel("Norm Values")
     plt.ylabel("Frequency")
     plt.show()
+
+    
     #########################################################################################################
 
     ## 2. Attention maps for the last Attention Head
-    print("Attention maps for the last Attention Head")
-    attn_map_mean = (
-        test_model.blocks[num_blocks - 1].attn.attn_map.squeeze(0).mean(dim=0)
-    )
-    ### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    if discard_tokens > 0:
-        attn_map_mean = attn_map_mean[token][1:-discard_tokens]
-    else:
-        attn_map_mean = attn_map_mean[token][1:]
-    if log_scale:
-        attn_map_mean = torch.log(attn_map_mean + 1e-6)
-    # attn_map_mean.shape
+    # print("Attention maps for the last Attention Head")
+    # attn_map_mean = (
+    #     test_model.blocks[num_blocks - 1].attn.attn_map.squeeze(0).mean(dim=0)
+    # )
+    # ### !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # if discard_tokens > 0:
+    #     attn_map_mean = attn_map_mean[token][1:-discard_tokens]
+    # else:
+    #     attn_map_mean = attn_map_mean[token][1:]
+    # if log_scale:
+    #     attn_map_mean = torch.log(attn_map_mean + 1e-6)
+    # # attn_map_mean.shape
 
-    plt.imshow(attn_map_mean.reshape(shape[0], shape[1]).detach().numpy())
-    plt.axis("off")
-    plt.colorbar(label="CLS attention map")
-    plt.show()
+    # plt.imshow(attn_map_mean.reshape(shape[0], shape[1]).detach().numpy())
+    # plt.axis("off")
+    # plt.colorbar(label="CLS attention map")
+    # plt.show()
     #########################################################################################################
 
     ## 3. All attention maps
     print("All attention maps")
 
-    num_cols = 6
     num_rows = (
         num_blocks + num_cols - 1
     ) // num_cols  # calculate the number of rows needed
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, num_rows * 2.5))
     axes = axes.flatten()
 
+    attn_reg = []
+
     for i in range(num_blocks):
         attn_map = test_model.blocks[i].attn.attn_map.squeeze(0).mean(dim=0)
         # attn_map = attn_map[token][1:] # !!!!!!!!!!!
         if discard_tokens > 0:
+            attn_cls = attn_map[token][0]
+            attn_reg.append(attn_map[token][-discard_tokens:])
             attn_map = attn_map[token][1:-discard_tokens]
         else:
+            attn_cls = attn_map[token][0]
             attn_map = attn_map[token][1:]
         attn_map_img = attn_map.reshape(shape[0], shape[1]).detach().numpy()
 
-        axes[i].imshow(attn_map_img)
+        im = axes[i].imshow(attn_map_img)
         axes[i].axis("off")
-        axes[i].set_title(f"Block {i+1}")
+        axes[i].set_title(f"Block {i+1}, CLS: {attn_cls:.3f}")
+        fig.colorbar(im, ax=axes[i], orientation='vertical')
 
     # Hide any remaining empty subplots
     for j in range(i + 1, len(axes)):
@@ -99,6 +111,57 @@ def show_artifacts(
 
     plt.tight_layout()
     plt.show()
+
+    if unfrozen_layers > 0:
+        for i in list(range(unfrozen_layers))[::-1]:
+            print("Attention of register tokens in block", num_blocks - i , "=", [round(float(x), 4) for x in attn_reg[num_blocks-1-i].detach().numpy()])
+    print('\n')
+    #########################################################################################################
+
+    ## 4. All norm maps
+    print("All norm maps")
+
+    num_rows = (
+        num_blocks + num_cols - 1
+    ) // num_cols  # calculate the number of rows needed
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, num_rows * 2.5))
+    axes = axes.flatten()
+    output_norms_reg = []
+
+    for i in range(num_blocks):
+        output = test_model.block_output[f"block{i}"]
+        output = output.squeeze(0)
+        # output = output[1:] # !!!!!!!!!!!
+        if discard_tokens > 0:
+            output_cls = output[0]
+            output_reg = output[-discard_tokens:]
+            output = output[1:-discard_tokens]
+        else:
+            output_cls = output[0]
+            output = output[1:]
+        output_norms_cls = output_cls.norm(dim=-1)
+        output_norms_reg.append(output_reg.norm(dim=-1))
+        output_norms = output.norm(dim=-1)
+        output_norms_img = output_norms.reshape(shape[0], shape[1]).detach().numpy()
+
+        im = axes[i].imshow(output_norms_img)
+        axes[i].axis("off")
+        axes[i].set_title(f"Block {i+1}, cls = " + str(round(output_norms_cls.item(), 2)))
+        fig.colorbar(im, ax=axes[i], orientation='vertical')
+
+    # Hide any remaining empty subplots
+    for j in range(i + 1, len(axes)):
+        axes[j].axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+    #print(output_norms_reg)
+    if unfrozen_layers > 0:
+        for i in list(range(unfrozen_layers))[::-1]:
+            print("Norm of register tokens in block", num_blocks - i , "=", [round(float(x), 3) for x in output_norms_reg[num_blocks-1-i].detach().numpy()])
+    
+    
 
     #########################################################################################################
 
