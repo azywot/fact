@@ -172,7 +172,7 @@ def get_args_parser():
                         choices=['kingdom', 'phylum', 'class', 'order', 'supercategory', 'family', 'genus', 'name'],
                         type=str, help='semantic granularity')
 
-    parser.add_argument('--output_dir', default=f'{datetime.datetime.now().strftime('%d_%m_%Y_%H_%M')}',
+    parser.add_argument('--output_dir', default=f'results/{datetime.datetime.now().strftime('%d_%m_%Y_%H_%M')}',
                         help='path where to save, current date and time in DD_MM_RRRR_HH_MM set as default')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
@@ -512,6 +512,9 @@ def main(args):
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
+
+            with (output_dir / "args.json").open("w") as f:
+                json.dump(vars(args), f)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
