@@ -114,7 +114,7 @@ def show_artifacts(
     plt.tight_layout()
     plt.show()
 
-    if unfrozen_layers > 0:
+    if discard_tokens > 0:
         for i in list(range(unfrozen_layers))[::-1]:
             print("Attention of register tokens in block", num_blocks - i , "=", [round(float(x), 4) for x in attn_reg[num_blocks-1-i].detach().numpy()])
     print('\n')
@@ -160,7 +160,7 @@ def show_artifacts(
     plt.show()
 
     #print(output_norms_reg)
-    if unfrozen_layers > 0:
+    if discard_tokens > 0:
         for i in list(range(unfrozen_layers))[::-1]:
             print("Norm of register tokens in block", num_blocks - i , "=", [round(float(x), 3) for x in output_norms_reg[num_blocks-1-i].detach().numpy()])
     
