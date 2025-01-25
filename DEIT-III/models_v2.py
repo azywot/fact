@@ -59,18 +59,13 @@ class Block(nn.Module):
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp_block(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
-        self.save_block = dict()
-        self.i = 0
+        self.block_output = None
+
 
     def forward(self, x):
         x = x + self.drop_path(self.attn(self.norm1(x)))
-
-
-        self.save_block['block'+str(self.i)] = x
-        self.i+=1
-
-
         x = x + self.drop_path(self.mlp(self.norm2(x)))
+        self.block_output = x
         return x 
     
 class Layer_scale_init_Block(nn.Module):
@@ -90,13 +85,16 @@ class Layer_scale_init_Block(nn.Module):
         self.mlp = Mlp_block(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
         self.gamma_1 = nn.Parameter(init_values * torch.ones((dim)),requires_grad=True)
         self.gamma_2 = nn.Parameter(init_values * torch.ones((dim)),requires_grad=True)
+        self.block_output = None
 
     def forward(self, x):
         x = x + self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
 
-        self.attn_output = self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
+        #self.attn_output = self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
 
         x = x + self.drop_path(self.gamma_2 * self.mlp(self.norm2(x)))
+
+        self.block_output = x
         return x
 
 class Layer_scale_init_Block_paralx2(nn.Module):
