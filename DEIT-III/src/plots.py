@@ -114,7 +114,7 @@ def show_artifacts(
     plt.tight_layout()
     plt.show()
 
-    if unfrozen_layers > 0:
+    if discard_tokens > 0:
         for i in list(range(unfrozen_layers))[::-1]:
             print("Attention of register tokens in block", num_blocks - i , "=", [round(float(x), 4) for x in attn_reg[num_blocks-1-i].detach().numpy()])
     print('\n')
@@ -160,7 +160,7 @@ def show_artifacts(
     plt.show()
 
     #print(output_norms_reg)
-    if unfrozen_layers > 0:
+    if discard_tokens > 0:
         for i in list(range(unfrozen_layers))[::-1]:
             print("Norm of register tokens in block", num_blocks - i , "=", [round(float(x), 3) for x in output_norms_reg[num_blocks-1-i].detach().numpy()])
     
@@ -267,6 +267,7 @@ def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tu
     for i in range(num_images):
         attn_map = test_model.blocks[i].attn.attn_map.squeeze(0).mean(dim=0)
         if str(token) == "cls":
+            attn_cls = attn_map[0][0]
             if discard_tokens > 0:
                 attn_map = attn_map[0][1:-discard_tokens]
             else:
@@ -279,6 +280,7 @@ def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tu
             return
 
         else:
+            attn_cls = attn_map[token + 1][0]
             if discard_tokens > 0:
                 attn_map = attn_map[token + 1][1:-discard_tokens]
             else:
@@ -286,9 +288,16 @@ def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tu
         
         attn_map_img = attn_map.reshape(grid_size).detach().numpy()
 
-        axes[i].imshow(attn_map_img)
+
+        # im = axes[i].imshow(attn_map_img)
+        # axes[i].axis("off")
+        # axes[i].set_title(f"Block {i+1}, CLS: {attn_cls:.3f}")
+        # fig.colorbar(im, ax=axes[i], orientation='vertical')
+
+        im = axes[i].imshow(attn_map_img)
         axes[i].axis("off")
-        axes[i].set_title(f"Block {i+1}")
+        axes[i].set_title(f"Block {i+1}, CLS: {attn_cls:.3f}")
+        fig.colorbar(im, ax=axes[i], orientation='vertical')
 
     # hide any remaining empty subplots
     for j in range(i + 1, len(axes)):
