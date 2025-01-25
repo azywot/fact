@@ -90,7 +90,7 @@ class Layer_scale_init_Block(nn.Module):
     def forward(self, x):
         x = x + self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
 
-        #self.attn_output = self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
+        self.attn_output = self.drop_path(self.gamma_1 * self.attn(self.norm1(x)))
 
         x = x + self.drop_path(self.gamma_2 * self.mlp(self.norm2(x)))
 
