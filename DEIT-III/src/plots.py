@@ -284,6 +284,7 @@ def show_attn_progression(
     grid_size: tuple = (24, 24),
     discard_tokens: int = 0,
     save_path: str = None,
+    token_name: str = "CLS",
 ) -> None:
 
     ## All attention maps
@@ -316,6 +317,7 @@ def show_attn_progression(
                     grid_size=grid_size,
                     discard_tokens=discard_tokens,
                     save_path=save_path,
+                    token_name=f"Reg{j}",
                 )
             return
 
@@ -335,8 +337,8 @@ def show_attn_progression(
 
         im = axes[i].imshow(attn_map_img)
         axes[i].axis("off")
-        axes[i].set_title(f"Block {i+1}, CLS: {attn_cls:.3f}")
-        fig.colorbar(im, ax=axes[i], orientation="vertical")
+        axes[i].set_title(f"Block {i+1}, {token_name}: {attn_cls:.3f}")
+        # fig.colorbar(im, ax=axes[i], orientation="vertical")
 
     # hide any remaining empty subplots
     for j in range(i + 1, len(axes)):
