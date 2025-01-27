@@ -1,13 +1,21 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 import torch
 import torch.nn as nn
-import numpy as np
-from PIL import Image
 from matplotlib.colors import LogNorm
+from PIL import Image
+
 
 def show_artifacts(
-    test_model: nn.Module, test_image: torch.Tensor, log_scale=False, token: int = 0, shape: tuple = (24, 24), discard_tokens: int = 0, num_cols: int = 4, unfrozen_layers: int = 0
+    test_model: nn.Module,
+    test_image: torch.Tensor,
+    log_scale=False,
+    token: int = 0,
+    shape: tuple = (24, 24),
+    discard_tokens: int = 0,
+    num_cols: int = 4,
+    unfrozen_layers: int = 0,
 ) -> None:
     """
     Generate the Attention maps and the norm values for the DEIT-III model
@@ -32,7 +40,7 @@ def show_artifacts(
 
     # TODO: double check
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    #discard_tokens = 4 # discard the CLS token and 4 register tokens
+    # discard_tokens = 4 # discard the CLS token and 4 register tokens
     if discard_tokens > 0:
         cls = output_norms[0]
         registers = output_norms[-discard_tokens:]
@@ -48,15 +56,17 @@ def show_artifacts(
     plt.show()
 
     if discard_tokens > 0:
-        print("Norm of register tokens: ", [round(float(x), 3) for x in registers.detach().numpy()])
-    print('Norm of CLS token: ', (cls.detach().numpy()))
+        print(
+            "Norm of register tokens: ",
+            [round(float(x), 3) for x in registers.detach().numpy()],
+        )
+    print("Norm of CLS token: ", (cls.detach().numpy()))
 
     plt.hist(output_norms.detach().numpy(), bins=50)
     plt.xlabel("Norm Values")
     plt.ylabel("Frequency")
     plt.show()
 
-    
     #########################################################################################################
 
     ## 2. Attention maps for the last Attention Head
@@ -105,7 +115,7 @@ def show_artifacts(
         im = axes[i].imshow(attn_map_img)
         axes[i].axis("off")
         axes[i].set_title(f"Block {i+1}, CLS: {attn_cls:.3f}")
-        fig.colorbar(im, ax=axes[i], orientation='vertical')
+        fig.colorbar(im, ax=axes[i], orientation="vertical")
 
     # Hide any remaining empty subplots
     for j in range(i + 1, len(axes)):
@@ -116,8 +126,16 @@ def show_artifacts(
 
     if discard_tokens > 0:
         for i in list(range(unfrozen_layers))[::-1]:
-            print("Attention of register tokens in block", num_blocks - i , "=", [round(float(x), 4) for x in attn_reg[num_blocks-1-i].detach().numpy()])
-    print('\n')
+            print(
+                "Attention of register tokens in block",
+                num_blocks - i,
+                "=",
+                [
+                    round(float(x), 4)
+                    for x in attn_reg[num_blocks - 1 - i].detach().numpy()
+                ],
+            )
+    print("\n")
     #########################################################################################################
 
     ## 4. All norm maps
@@ -149,8 +167,10 @@ def show_artifacts(
 
         im = axes[i].imshow(output_norms_img)
         axes[i].axis("off")
-        axes[i].set_title(f"Block {i+1}, cls = " + str(round(output_norms_cls.item(), 2)))
-        fig.colorbar(im, ax=axes[i], orientation='vertical')
+        axes[i].set_title(
+            f"Block {i+1}, cls = " + str(round(output_norms_cls.item(), 2))
+        )
+        fig.colorbar(im, ax=axes[i], orientation="vertical")
 
     # Hide any remaining empty subplots
     for j in range(i + 1, len(axes)):
@@ -159,12 +179,18 @@ def show_artifacts(
     plt.tight_layout()
     plt.show()
 
-    #print(output_norms_reg)
+    # print(output_norms_reg)
     if discard_tokens > 0:
         for i in list(range(unfrozen_layers))[::-1]:
-            print("Norm of register tokens in block", num_blocks - i , "=", [round(float(x), 3) for x in output_norms_reg[num_blocks-1-i].detach().numpy()])
-    
-    
+            print(
+                "Norm of register tokens in block",
+                num_blocks - i,
+                "=",
+                [
+                    round(float(x), 3)
+                    for x in output_norms_reg[num_blocks - 1 - i].detach().numpy()
+                ],
+            )
 
     #########################################################################################################
 
@@ -246,13 +272,19 @@ def plot_feature_norms_with_high_attn(
     plt.colorbar(label="Attention Map")
 
     plt.gcf().set_size_inches(12, 6)  # Make the image bigger
-    #plt.show()set_size_inches(12, 6)  # Make the image bigger
-    #plt.show()set_size_inches(12, 6)  # Make the image bigger
-    #plt.show()set_size_inches(12, 6)  # Make the image bigger
+    # plt.show()set_size_inches(12, 6)  # Make the image bigger
+    # plt.show()set_size_inches(12, 6)  # Make the image bigger
+    # plt.show()set_size_inches(12, 6)  # Make the image bigger
     plt.show()
 
 
-def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tuple = (24, 24), discard_tokens: int=0) -> None:
+def show_attn_progression(
+    test_model: nn.Module,
+    token: str = "cls",
+    grid_size: tuple = (24, 24),
+    discard_tokens: int = 0,
+    save_path: str = None,
+) -> None:
 
     ## All attention maps
     num_images = len(test_model.blocks)
@@ -272,11 +304,19 @@ def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tu
                 attn_map = attn_map[0][1:-discard_tokens]
             else:
                 attn_map = attn_map[0][1:]
-            
+
         elif str(token) == "reg":
             for j in range(1, discard_tokens + 1):
                 plt.close(fig)
-                show_attn_progression(test_model, token= - 1 - j, grid_size=grid_size, discard_tokens=discard_tokens)
+                if save_path is not None:
+                    save_path = save_path[:-8] + f"reg{j}.png"
+                show_attn_progression(
+                    test_model,
+                    token=-1 - j,
+                    grid_size=grid_size,
+                    discard_tokens=discard_tokens,
+                    save_path=save_path,
+                )
             return
 
         else:
@@ -285,9 +325,8 @@ def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tu
                 attn_map = attn_map[token + 1][1:-discard_tokens]
             else:
                 attn_map = attn_map[token + 1][1:]
-        
-        attn_map_img = attn_map.reshape(grid_size).detach().numpy()
 
+        attn_map_img = attn_map.reshape(grid_size).detach().numpy()
 
         # im = axes[i].imshow(attn_map_img)
         # axes[i].axis("off")
@@ -297,20 +336,29 @@ def show_attn_progression(test_model: nn.Module, token: str="cls", grid_size: tu
         im = axes[i].imshow(attn_map_img)
         axes[i].axis("off")
         axes[i].set_title(f"Block {i+1}, CLS: {attn_cls:.3f}")
-        fig.colorbar(im, ax=axes[i], orientation='vertical')
+        fig.colorbar(im, ax=axes[i], orientation="vertical")
 
     # hide any remaining empty subplots
     for j in range(i + 1, len(axes)):
         axes[j].axis("off")
 
     plt.tight_layout()
-    plt.show()
+    if save_path is not None:
+        plt.savefig(save_path)
+    else:
+        plt.show()
 
 
-def plot_similarity_density(top_norm_similarities: list, not_top_norm_similarities: list) -> None:
+def plot_similarity_density(
+    top_norm_similarities: list, not_top_norm_similarities: list
+) -> None:
     plt.figure(figsize=(6, 4))
-    sns.kdeplot(not_top_norm_similarities, label='normal patches', color='blue', bw_adjust=0.5)
-    sns.kdeplot(top_norm_similarities, label='artifact patches', color='orange', bw_adjust=0.5)
+    sns.kdeplot(
+        not_top_norm_similarities, label="normal patches", color="blue", bw_adjust=0.5
+    )
+    sns.kdeplot(
+        top_norm_similarities, label="artifact patches", color="orange", bw_adjust=0.5
+    )
 
     plt.xlabel("Cosine similarity")
     plt.ylabel("Density")
@@ -377,11 +425,28 @@ def norm_per_layer(chosen_model: nn.Module, discard_tokens: int = 0) -> list:
     layer_norms = []
     for x in range(12):
         if discard_tokens > 0:
-            layer_norms.append(torch.log(chosen_model.block_output['block'+ str(x)].squeeze()[1:-discard_tokens,:].norm(dim = -1) + 1e-6).detach().numpy())
+            layer_norms.append(
+                torch.log(
+                    chosen_model.block_output["block" + str(x)]
+                    .squeeze()[1:-discard_tokens, :]
+                    .norm(dim=-1)
+                    + 1e-6
+                )
+                .detach()
+                .numpy()
+            )
         else:
-            layer_norms.append(torch.log(chosen_model.block_output['block'+ str(x)].squeeze()[1:,:].norm(dim = -1) + 1e-6).detach().numpy())
+            layer_norms.append(
+                torch.log(
+                    chosen_model.block_output["block" + str(x)]
+                    .squeeze()[1:, :]
+                    .norm(dim=-1)
+                    + 1e-6
+                )
+                .detach()
+                .numpy()
+            )
         # layer_norms.append(chosen_model.block_output['block'+ str(x)].squeeze()[1:,:].norm(dim = -1).detach().numpy())
-
 
     plt.figure(figsize=(12, 8))  # Adjust the width and height as needed
     for i, norms in enumerate(layer_norms):
