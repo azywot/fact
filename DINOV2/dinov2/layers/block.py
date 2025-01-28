@@ -59,7 +59,6 @@ class Block(nn.Module):
         ffn_layer: Callable[..., nn.Module] = Mlp,
     ) -> None:
         super().__init__()
-        # print(f"biases: qkv: {qkv_bias}, proj: {proj_bias}, ffn: {ffn_bias}")
         self.norm1 = norm_layer(dim)
         self.attn = attn_class(
             dim,
@@ -87,18 +86,20 @@ class Block(nn.Module):
         self.sample_drop_ratio = drop_path
 
     def forward(self, x: Tensor, return_attention=False) -> Tensor:
+        """
+        Forward pass for the block, optionally returning attention maps.
+        """
         def attn_residual_func(x: Tensor) -> Tensor:
-            return self.ls1(self.attn(self.norm1(x)))
+            return self.ls1(self.attn(self.norm1(x), return_attn=return_attention))
 
         def ffn_residual_func(x: Tensor) -> Tensor:
             return self.ls2(self.mlp(self.norm2(x)))
-        
-        # Add this 2 lines
+
         if return_attention:
-            return self.attn(self.norm1(x), return_attn=True)
-            
+            attn = self.attn(self.norm1(x), return_attn=True)
+            return attn
+
         if self.training and self.sample_drop_ratio > 0.1:
-            # the overhead is compensated only for a drop path rate larger than 0.1
             x = drop_add_residual_stochastic_depth(
                 x,
                 residual_func=attn_residual_func,
@@ -115,7 +116,12 @@ class Block(nn.Module):
         else:
             x = x + attn_residual_func(x)
             x = x + ffn_residual_func(x)
+
+        # Store the block output
+        self.block_output = x.clone()
+
         return x
+
 
 
 
