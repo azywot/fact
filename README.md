@@ -44,3 +44,24 @@ The models `dino_vitbase16_pretrain` and `dinov2_vitl14_pretrain.pth` need to be
 For access to the fine-tuned versions of the DEIT-III small model, please contact the developers for the model weights.
 
 
+## How to run fine-tuning
+In order to perform model fine-tuning, the original DEIT-III codebase was modified. Now, it is possible to specify the number of frozen layers as well as the number of registers to introduce. An example command to run fine-tuning is provided below:
+
+```
+srun python -m torch.distributed.launch \
+--nproc_per_node 2 \
+--use_env DEIT-III/main.py \
+--num_workers 8 \
+--epochs 10 \
+--batch-size 256 \
+--data-set IMNET \
+--data-path [DATA_PATH] \
+--model deit_small_patch16_LS_reg \
+--output_dir [OUTPUT_DIR] \
+--freeze-layers 10 \
+--num-registers 4 \
+--l2-weight 0.001 \
+--pretrained-21k \
+--reg-use-pretrained # whether to use pretrained DEIT-III model 
+```
+

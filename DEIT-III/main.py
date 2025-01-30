@@ -46,7 +46,7 @@ def get_args_parser():
     parser.add_argument('--drop-path', type=float, default=0.1, metavar='PCT',
                         help='Drop path rate (default: 0.1)')
 
-    parser.add_argument('--model-ema', action='store_true') # TODO: what is it?
+    parser.add_argument('--model-ema', action='store_true')
     parser.add_argument('--no-model-ema', action='store_false', dest='model_ema')
     parser.set_defaults(model_ema=True)
     parser.add_argument('--model-ema-decay', type=float, default=0.99996, help='')
@@ -165,7 +165,7 @@ def get_args_parser():
     
     # Dataset parameters
     parser.add_argument('--data-path', default='/datasets01/imagenet_full_size/061417/', type=str,
-                        help='dataset path') # TODO: add imagenet subset
+                        help='dataset path')
     parser.add_argument('--data-set', default='IMNET', choices=['CIFAR', 'IMNET', 'INAT', 'INAT19'],
                         type=str, help='Image Net dataset path')
     parser.add_argument('--inat-category', default='name',
