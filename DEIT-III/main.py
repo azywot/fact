@@ -162,6 +162,7 @@ def get_args_parser():
     parser.add_argument('--freeze-layers', type=int, default=0, help='freeze n first layers in a pre-trained model')
     parser.add_argument('--l2-weight', type=float, default=0.0, help='L2 regularization weight')
     parser.add_argument('--l2_decay', action='store_true', help='reduce L2 weight every epoch')
+    parser.add_argument('--exp_decay', action='store_true', help='L2 weight decay with exponential decay')
     ######################################################################################
     
     # Dataset parameters
