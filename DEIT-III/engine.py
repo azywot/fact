@@ -81,6 +81,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 l2_norm_loss = args.l2_weight / (epoch + 1) * output_norms.mean()
             elif args.exp_decay:
                 l2_norm_loss = args.l2_weight ** ((epoch % 10) + 1) * output_norms.mean()
+            elif args.exp_soft_decay:
+                l2_norm_loss = args.l2_weight ** ((epoch / 10) + 1) * output_norms.mean()
+            elif args.cos_decay:
+                l2_norm_loss = args.l2_weight * math.cos(math.pi * (epoch % 10) / 20) * output_norms.mean()
             elif args.step_decay:
                 if epoch < 10:
                     l2_norm_loss = args.l2_weight * output_norms.mean()
