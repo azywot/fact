@@ -85,7 +85,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                 if epoch < 10:
                     l2_norm_loss = args.l2_weight * output_norms.mean()
                 else:
-                    l2_norm_loss = 0
+                    l2_norm_loss = 0 * output_norms.mean()
             else:
                 l2_norm_loss = args.l2_weight * output_norms.mean()
             print("*"*20, "Cross-entropy loss: ", loss.item())
