@@ -353,20 +353,29 @@ def main(args):
             print('no patch embed')
 
     ####################################### F A C T #######################################
-    # TODO: change for DEIT-III segmentation model
     # freeze specified layers if pretrained and freeze_layers > 0
     if args.freeze_layers > 0: # and args.reg_use_pretrained:
-        for param in model.patch_embed.parameters():
-            param.requires_grad = False
-        print(">"*20, "Froze the patch embeddings.")
-        num_blocks = len(model.blocks)
-        freeze_until = min(args.freeze_layers, num_blocks)
-        for block_idx in range(freeze_until):
-            for param in model.blocks[block_idx].parameters():
+        if args.segmentation: # NOTE: segmentation model (added .vit)
+            for param in model.vit.patch_embed.parameters():
                 param.requires_grad = False
-        print(">"*20, f"Froze {freeze_until} out of {num_blocks} layers of the model.")
+            print(">"*20, "Froze the patch embeddings.")
+            num_blocks = len(model.vit.blocks)
+            freeze_until = min(args.freeze_layers, num_blocks)
+            for block_idx in range(freeze_until):
+                for param in model.vit.blocks[block_idx].parameters():
+                    param.requires_grad = False
+            print(">"*20, f"Froze {freeze_until} out of {num_blocks} layers of the model.")
+        else:
+            for param in model.patch_embed.parameters():
+                param.requires_grad = False
+            print(">"*20, "Froze the patch embeddings.")
+            num_blocks = len(model.blocks)
+            freeze_until = min(args.freeze_layers, num_blocks)
+            for block_idx in range(freeze_until):
+                for param in model.blocks[block_idx].parameters():
+                    param.requires_grad = False
+            print(">"*20, f"Froze {freeze_until} out of {num_blocks} layers of the model.")
     ######################################################################################
-
     model.to(device)
 
     model_ema = None
@@ -392,10 +401,13 @@ def main(args):
 
     lr_scheduler, _ = create_scheduler(args, optimizer)
 
-    criterion = LabelSmoothingCrossEntropy()
+    # criterion = LabelSmoothingCrossEntropy()
 
     # NOTE: try with CrossEntropyLoss first
-    criterion = torch.nn.CrossEntropyLoss()
+    if args.segmentation:
+        criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
+    else:
+        criterion = torch.nn.CrossEntropyLoss()
     # if mixup_active:
     #     # smoothing is handled with mixup label transform
     #     criterion = SoftTargetCrossEntropy()
