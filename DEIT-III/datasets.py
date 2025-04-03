@@ -66,7 +66,7 @@ class INatDataset(ImageFolder):
 
 
 class ADE20KSegmentation(Dataset):
-    def __init__(self, root, is_train=True, image_size=518):
+    def __init__(self, root, is_train=True, image_size=224):
 
         super().__init__()
         if is_train:
@@ -144,7 +144,7 @@ def build_dataset(is_train, args):
         )
         nb_classes = dataset.nb_classes
     elif args.data_set == "ADE20K":
-        dataset = ADE20KSegmentation(args.data_path, train=is_train, image_size=224)
+        dataset = ADE20KSegmentation(args.data_path, train=is_train)
         nb_classes = args.segmentation_classes
 
     return dataset, nb_classes
