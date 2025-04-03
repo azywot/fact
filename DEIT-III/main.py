@@ -2,31 +2,27 @@
 # All rights reserved.
 import argparse
 import datetime
-import numpy as np
-import time
-import torch
-import torch.backends.cudnn as cudnn
 import json
-
+import time
 from pathlib import Path
-
-from timm.data import Mixup
-from timm.models import create_model
-from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
-from timm.scheduler import create_scheduler
-from timm.optim import create_optimizer
-from timm.utils import NativeScaler, get_state_dict, ModelEma
-
-from datasets import build_dataset
-from engine import train_one_epoch, evaluate
-from losses import DistillationLoss
-from samplers import RASampler
-from augment import new_data_aug_generator
 
 import models
 import models_v2
-
+import numpy as np
+import torch
+import torch.backends.cudnn as cudnn
 import utils
+from augment import new_data_aug_generator
+from datasets import build_dataset
+from engine import evaluate, train_one_epoch
+from losses import DistillationLoss
+from samplers import RASampler
+from timm.data import Mixup
+from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
+from timm.models import create_model
+from timm.optim import create_optimizer
+from timm.scheduler import create_scheduler
+from timm.utils import ModelEma, NativeScaler, get_state_dict
 
 
 def get_args_parser():
@@ -166,8 +162,11 @@ def get_args_parser():
     parser.add_argument('--exp_soft_decay', action='store_true', help='L2 weight decay with exponential soft decay')
     parser.add_argument('--cos_decay', action='store_true', help='L2 weight decay with cosine decay')
     parser.add_argument('--step_decay', action='store_true', help='L2 weight decay with step decay')
+    ################## SEGMENTATION ##################
+    parser.add_argument('--segmentation', action='store_true', help='use segmentation head')
+    parser.add_argument('--segmentation-classes', type=int, default=, help='number of segmentation classes')
     ######################################################################################
-    
+
     # Dataset parameters
     parser.add_argument('--data-path', default='/datasets01/imagenet_full_size/061417/', type=str,
                         help='dataset path')
@@ -270,7 +269,7 @@ def main(args):
     )
 
     mixup_fn = None
-    mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
+    # mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
     # NOTE: mixup_fn not used
     # if mixup_active:
     #     mixup_fn = Mixup(
@@ -279,6 +278,7 @@ def main(args):
     #         label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
     print(f"Creating model: {args.model}")
+    # TODO: initialize DeitIII segmentation model - adjust the model creation function in models.py
     model = create_model(
         args.model,
         pretrained=args.reg_use_pretrained, # NOTE: was originally set to False
@@ -353,6 +353,7 @@ def main(args):
             print('no patch embed')
 
     ####################################### F A C T #######################################
+    # TODO: change for DEIT-III segmentation model
     # freeze specified layers if pretrained and freeze_layers > 0
     if args.freeze_layers > 0: # and args.reg_use_pretrained:
         for param in model.patch_embed.parameters():
@@ -463,6 +464,7 @@ def main(args):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
 
+        # TODO: change for DEIT-III segmentation model
         train_stats = train_one_epoch(
             model, criterion, data_loader_train,
             optimizer, device, epoch, loss_scaler,
