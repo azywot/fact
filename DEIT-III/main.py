@@ -14,7 +14,7 @@ import torch.backends.cudnn as cudnn
 import utils
 from augment import new_data_aug_generator
 from datasets import build_dataset
-from engine import evaluate, train_one_epoch
+from engine import evaluate, evaluate_segmentation, train_one_epoch
 from losses import DistillationLoss
 from samplers import RASampler
 from timm.data import Mixup
@@ -204,6 +204,9 @@ def get_args_parser():
 
 def main(args):
     utils.init_distributed_mode(args)
+    # NOTE: is we train DET-III for segmentation we should only ft the head not the attn blocks
+    if args.segmentation:
+        args.freeze_layers = 12
 
     print(args)
 
@@ -476,7 +479,6 @@ def main(args):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
 
-        # TODO: change for DEIT-III segmentation model
         train_stats = train_one_epoch(
             model, criterion, data_loader_train,
             optimizer, device, epoch, loss_scaler,
@@ -499,34 +501,53 @@ def main(args):
                     'args': args,
                 }, checkpoint_path)
              
+        if args.segmentation:
+            test_stats = evaluate_segmentation(data_loader_val, model, device, args.segmentation_classes)
+            print(f"mIoU of the network on the {len(dataset_val)} test images: {test_stats['mIoU']}")
 
-        test_stats = evaluate(data_loader_val, model, device)
-        print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
-        
-        if max_accuracy < test_stats["acc1"]:
-            max_accuracy = test_stats["acc1"]
-            if args.output_dir:
-                checkpoint_paths = [output_dir / 'best_checkpoint.pth']
-                for checkpoint_path in checkpoint_paths:
-                    utils.save_on_master({
-                        'model': model_without_ddp.state_dict(),
-                        'optimizer': optimizer.state_dict(),
-                        'lr_scheduler': lr_scheduler.state_dict(),
-                        'epoch': epoch,
-                        'model_ema': get_state_dict(model_ema),
-                        'scaler': loss_scaler.state_dict(),
-                        'args': args,
-                    }, checkpoint_path)
+            #  NOTE: use max_accuracy to store max mIoU
+            if max_accuracy < test_stats["mIoU"]:
+                max_accuracy = test_stats["mIoU"]
+                if args.output_dir:
+                    checkpoint_paths = [output_dir / 'best_checkpoint.pth']
+                    for checkpoint_path in checkpoint_paths:
+                        utils.save_on_master({
+                            'model': model_without_ddp.state_dict(),
+                            'optimizer': optimizer.state_dict(),
+                            'lr_scheduler': lr_scheduler.state_dict(),
+                            'epoch': epoch,
+                            'model_ema': get_state_dict(model_ema),
+                            'scaler': loss_scaler.state_dict(),
+                            'args': args,
+                        }, checkpoint_path)
             
-        print(f'Max accuracy: {max_accuracy:.2f}%')
+            print(f'Max mIoU: {max_accuracy:.2f}')
+
+        else:
+            test_stats = evaluate(data_loader_val, model, device)
+            print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+        
+            if max_accuracy < test_stats["acc1"]:
+                max_accuracy = test_stats["acc1"]
+                if args.output_dir:
+                    checkpoint_paths = [output_dir / 'best_checkpoint.pth']
+                    for checkpoint_path in checkpoint_paths:
+                        utils.save_on_master({
+                            'model': model_without_ddp.state_dict(),
+                            'optimizer': optimizer.state_dict(),
+                            'lr_scheduler': lr_scheduler.state_dict(),
+                            'epoch': epoch,
+                            'model_ema': get_state_dict(model_ema),
+                            'scaler': loss_scaler.state_dict(),
+                            'args': args,
+                        }, checkpoint_path)
+                
+            print(f'Max accuracy: {max_accuracy:.2f}%')
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                     **{f'test_{k}': v for k, v in test_stats.items()},
-                     'epoch': epoch,
-                     'n_parameters': n_parameters}
-        
-        
-        
+                    **{f'test_{k}': v for k, v in test_stats.items()},
+                    'epoch': epoch,
+                    'n_parameters': n_parameters}
         
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
