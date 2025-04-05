@@ -204,9 +204,6 @@ def get_args_parser():
 
 def main(args):
     utils.init_distributed_mode(args)
-    # NOTE: is we train DET-III for segmentation we should only ft the head not the attn blocks
-    if args.segmentation:
-        args.freeze_layers = 12
 
     print(args)
 
