@@ -368,6 +368,9 @@ def main(args):
                 for param in model.vit.blocks[block_idx].parameters():
                     param.requires_grad = False
             print(">"*20, f"Froze {freeze_until} out of {num_blocks} layers of the model.")
+            # freeze linear head for cls:
+            for param in model.vit.head.parameters():
+                param.requires_grad = False
         else:
             for param in model.patch_embed.parameters():
                 param.requires_grad = False
