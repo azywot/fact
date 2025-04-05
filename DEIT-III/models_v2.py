@@ -380,7 +380,7 @@ class vit_models(nn.Module):
         init_scale=1e-4,
         mlp_ratio_clstk=4.0,
         num_registers=0,
-        segmentation=False,
+        use_norm_layer=True,
         **kwargs,
     ):  # no registers by default
         super().__init__()
@@ -439,7 +439,7 @@ class vit_models(nn.Module):
 
         # NOTE: whether the registers are used or not
         self.num_registers = num_registers
-        self.segmentation = segmentation
+        self.use_norm_layer = use_norm_layer
 
     def init_register_tokens(self):
         print(">" * 20, f"NUMBER OF REGISTERS: {self.num_registers}")
@@ -502,7 +502,7 @@ class vit_models(nn.Module):
             x = blk(x)
             self.block_output["block" + str(i)] = x
 
-        if self.segmentation:
+        if self.use_norm_layer:
             x = self.norm(x)
         self.block_output["final"] = x
         # print("final shape:", x.shape)
@@ -732,7 +732,7 @@ def segmentation_deit_small_patch16_LS_reg(
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         block_layers=Layer_scale_init_Block,
-        segmentation=True,  # NOTE: without x = self.norm(x) in forward_features
+        use_norm_layer=False,  # NOTE: with/without x = self.norm(x) in forward_features
         **kwargs,
     )
     vit_model.default_cfg = _cfg()
