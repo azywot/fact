@@ -5,7 +5,6 @@ from functools import partial
 
 import torch
 import torch.nn as nn
-
 # import repeat (add registers)
 from einops import repeat
 from timm.models import register_model
@@ -381,6 +380,7 @@ class vit_models(nn.Module):
         init_scale=1e-4,
         mlp_ratio_clstk=4.0,
         num_registers=0,
+        segmentation=False,
         **kwargs,
     ):  # no registers by default
         super().__init__()
@@ -439,6 +439,7 @@ class vit_models(nn.Module):
 
         # NOTE: whether the registers are used or not
         self.num_registers = num_registers
+        self.segmentation = segmentation
 
     def init_register_tokens(self):
         print(">" * 20, f"NUMBER OF REGISTERS: {self.num_registers}")
@@ -501,7 +502,8 @@ class vit_models(nn.Module):
             x = blk(x)
             self.block_output["block" + str(i)] = x
 
-        x = self.norm(x)
+        if self.segmentation:
+            x = self.norm(x)
         self.block_output["final"] = x
         # print("final shape:", x.shape)
         return x[:, 0]  # take only cls
@@ -563,14 +565,9 @@ class DeitSegModel(nn.Module):
         self.head = head
         self.num_registers = num_registers
 
-    # def forward(self, x):
-    #     features = self.vit.forward_features(x)
-    #     return self.head(features["x_norm_patchtokens"])
-
     def forward(self, x):
         self.vit.forward_features(x)
-        # features = self.vit.block_output["final"] NOTE: this is normalized, we keep the not-normalized one for consistency
-        features = self.vit.block_output["block11"]
+        features = self.vit.block_output["final"]
 
         if self.num_registers > 0:
             return self.head(features[:, 1 : -self.num_registers])
@@ -735,6 +732,7 @@ def segmentation_deit_small_patch16_LS_reg(
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         block_layers=Layer_scale_init_Block,
+        segmentation=True,  # NOTE: without x = self.norm(x) in forward_features
         **kwargs,
     )
     vit_model.default_cfg = _cfg()

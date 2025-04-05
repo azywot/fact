@@ -7,7 +7,6 @@ import time
 from pathlib import Path
 
 import models
-import models_v2
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -16,6 +15,7 @@ from augment import new_data_aug_generator
 from datasets import build_dataset
 from engine import evaluate, evaluate_segmentation, train_one_epoch
 from losses import DistillationLoss
+from models_v2 import segmentation_deit_small_patch16_LS_reg
 from samplers import RASampler
 from timm.data import Mixup
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
@@ -278,21 +278,29 @@ def main(args):
     #         label_smoothing=args.smoothing, num_classes=args.nb_classes)
 
     print(f"Creating model: {args.model}")
-    # TODO: initialize DeitIII segmentation model - adjust the model creation function in models.py
-    model = create_model(
-        args.model,
-        pretrained=args.reg_use_pretrained, # NOTE: was originally set to False
-        pretrained_21k = args.pretrained_21k,
-        num_classes=args.nb_classes,
-        drop_rate=args.drop,
-        drop_path_rate=args.drop_path,
-        drop_block_rate=None,
-        img_size=args.input_size,
-        num_registers=args.num_registers,
-    )
+    if args.segmentation:
+        # NOTE: nasty but create_model did not work bc of the shape mismatch in the head
+        model = segmentation_deit_small_patch16_LS_reg(
+            pretrained=args.reg_use_pretrained,
+            img_size=args.input_size,
+            pretrained_21k=args.pretrained_21k,
+            num_registers=args.num_registers,
+        )
+
+    else:
+        model = create_model(
+            args.model,
+            pretrained=args.reg_use_pretrained, # NOTE: was originally set to False
+            pretrained_21k = args.pretrained_21k,
+            num_classes=args.nb_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            drop_block_rate=None,
+            img_size=args.input_size,
+            num_registers=args.num_registers,
+        )
     print(">"*20, "MODEL CREATED!")
 
-                    
     if args.finetune:
         if args.finetune.startswith('https'):
             checkpoint = torch.hub.load_state_dict_from_url(
@@ -521,12 +529,12 @@ def main(args):
                             'args': args,
                         }, checkpoint_path)
             
-            print(f'Max mIoU: {max_accuracy:.2f}')
+            print(f'Max mIoU: {max_accuracy:.5f}')
 
         else:
             test_stats = evaluate(data_loader_val, model, device)
             print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
-        
+
             if max_accuracy < test_stats["acc1"]:
                 max_accuracy = test_stats["acc1"]
                 if args.output_dir:
@@ -541,14 +549,14 @@ def main(args):
                             'scaler': loss_scaler.state_dict(),
                             'args': args,
                         }, checkpoint_path)
-                
+
             print(f'Max accuracy: {max_accuracy:.2f}%')
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                     **{f'test_{k}': v for k, v in test_stats.items()},
                     'epoch': epoch,
                     'n_parameters': n_parameters}
-        
+
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
