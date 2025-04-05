@@ -18,7 +18,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, loss_scaler, max_norm: float = 0,
                     model_ema: Optional[ModelEma] = None, mixup_fn: Optional[Mixup] = None,
-                    set_training_mode=True, segmentation = False, args = None):
+                    set_training_mode=True, args = None):
     model.train(set_training_mode)
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
@@ -65,7 +65,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
             # [cls, patches, regs]
             discard_tokens = args.num_registers
             # not that neat but works both locally and on the cluster
-            if segmentation:
+            if args.segmentation:
                 if discard_tokens > 0:
                     final_output = outputs[:, 1:-discard_tokens, :]
                 else:
