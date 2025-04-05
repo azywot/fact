@@ -570,7 +570,7 @@ class DeitSegModel(nn.Module):
     def forward(self, x):
         self.vit.forward_features(x)
         # features = self.vit.block_output["final"] NOTE: this is normalized, we keep the not-normalized one for consistency
-        features = self.vit.block_output['block11']
+        features = self.vit.block_output["block11"]
 
         if self.num_registers > 0:
             return self.head(features[:, 1 : -self.num_registers])
@@ -750,6 +750,7 @@ def segmentation_deit_small_patch16_LS_reg(
             url=name, map_location="cpu", check_hash=True
         )
         vit_model.load_state_dict(checkpoint["model"])
+        print(">" * 20, "VIT PRETRAINED MODEL LOADED!")
 
     # Initialize the model with register tokens
     vit_model.init_register_tokens()

@@ -144,7 +144,7 @@ def build_dataset(is_train, args):
         )
         nb_classes = dataset.nb_classes
     elif args.data_set == "ADE20K":
-        dataset = ADE20KSegmentation(args.data_path, train=is_train)
+        dataset = ADE20KSegmentation(args.data_path, is_train=is_train)
         nb_classes = args.segmentation_classes
 
     return dataset, nb_classes
