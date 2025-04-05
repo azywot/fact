@@ -732,7 +732,7 @@ def segmentation_deit_small_patch16_LS_reg(
         qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         block_layers=Layer_scale_init_Block,
-        use_norm_layer=False,  # NOTE: with/without x = self.norm(x) in forward_features
+        use_norm_layer=True,  # NOTE: with/without x = self.norm(x) in forward_features
         **kwargs,
     )
     vit_model.default_cfg = _cfg()
