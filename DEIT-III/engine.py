@@ -18,7 +18,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, loss_scaler, max_norm: float = 0,
                     model_ema: Optional[ModelEma] = None, mixup_fn: Optional[Mixup] = None,
-                    set_training_mode=True, args = None):
+                    set_training_mode=True, segmentation = False, args = None):
     model.train(set_training_mode)
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
@@ -27,6 +27,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
     
     if args.cosub:
         criterion = torch.nn.BCEWithLogitsLoss()
+
+    if args.segmentation:
+        criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
         
     for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
         samples = samples.to(device, non_blocking=True)
@@ -40,11 +43,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
             
         if args.bce_loss:
             targets = targets.gt(0.0).type(targets.dtype)
-         
+        
         with torch.cuda.amp.autocast():
             outputs = model(samples)
             if not args.cosub:
                 loss = criterion(samples, outputs, targets)
+            elif args.segmentation:
+                loss = criterion(outputs, targets)
             else:
                 outputs = torch.split(outputs, outputs.shape[0]//2, dim=0)
                 loss = 0.25 * criterion(outputs[0], targets) 
@@ -59,22 +64,29 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
             # [cls, patches, regs]
             discard_tokens = args.num_registers
             # not that neat but works both locally and on the cluster
-            if discard_tokens > 0:
-                try:
-                    num_blocks = model.module.get_num_layers()-1
-                    final_output = model.module.block_output[f"block{num_blocks}"][:, 1:-discard_tokens]
-                    # final_output = model.module.block_output['final'][:, 1:-discard_tokens]
-                except:
-                    num_blocks = model.get_num_layers()-1
-                    final_output = model.block_output[f"block{num_blocks}"][:, 1:-discard_tokens]
-                    # final_output = model.block_output['final'][:, 1:-discard_tokens]
+            if segmentation:
+                if discard_tokens > 0:
+                    final_output = outputs[:, 1:-discard_tokens, :]
+                else:
+                    final_output = outputs[:, 1:, :]
+
             else:
-                try:
-                    num_blocks = model.module.get_num_layers()-1
-                    final_output = model.module.block_output[f"block{num_blocks}"][:, 1:]
-                except:
-                    num_blocks = model.get_num_layers()-1
-                    final_output = model.block_output[f"block{num_blocks}"][:, 1:]
+                if discard_tokens > 0:
+                    try:
+                        num_blocks = model.module.get_num_layers()-1
+                        final_output = model.module.block_output[f"block{num_blocks}"][:, 1:-discard_tokens]
+                        # final_output = model.module.block_output['final'][:, 1:-discard_tokens]
+                    except:
+                        num_blocks = model.get_num_layers()-1
+                        final_output = model.block_output[f"block{num_blocks}"][:, 1:-discard_tokens]
+                        # final_output = model.block_output['final'][:, 1:-discard_tokens]
+                else:
+                    try:
+                        num_blocks = model.module.get_num_layers()-1
+                        final_output = model.module.block_output[f"block{num_blocks}"][:, 1:]
+                    except:
+                        num_blocks = model.get_num_layers()-1
+                        final_output = model.block_output[f"block{num_blocks}"][:, 1:]
             
             output_norms = final_output.norm(dim=-1)
             if args.l2_decay:

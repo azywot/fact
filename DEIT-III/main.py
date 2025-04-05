@@ -164,7 +164,7 @@ def get_args_parser():
     parser.add_argument('--step_decay', action='store_true', help='L2 weight decay with step decay')
     ################## SEGMENTATION ##################
     parser.add_argument('--segmentation', action='store_true', help='use segmentation head')
-    parser.add_argument('--segmentation-classes', type=int, default=, help='number of segmentation classes')
+    parser.add_argument('--segmentation-classes', type=int, default=150, help='number of segmentation classes')
     ######################################################################################
 
     # Dataset parameters
@@ -481,7 +481,8 @@ def main(args):
             model, criterion, data_loader_train,
             optimizer, device, epoch, loss_scaler,
             args.clip_grad, model_ema, mixup_fn,
-            set_training_mode=args.train_mode,  # keep in eval mode for deit finetuning / train mode for training and deit III finetuning
+            set_training_mode=args.train_mode, # keep in eval mode for deit finetuning / train mode for training and deit III finetuning
+            segmentation = args.segmentation,  
             args = args,
         )
 
