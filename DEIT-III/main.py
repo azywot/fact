@@ -366,6 +366,10 @@ def main(args):
         if args.segmentation: # NOTE: segmentation model (added .vit)
             for param in model.vit.patch_embed.parameters():
                 param.requires_grad = False
+                
+            for param in model.vit.norm.parameters():
+                param.requires_grad = False
+
             print(">"*20, "Froze the patch embeddings.")
             num_blocks = len(model.vit.blocks)
             freeze_until = min(args.freeze_layers, num_blocks)
