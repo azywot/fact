@@ -285,7 +285,6 @@ def main(args):
             img_size=args.input_size,
             pretrained_21k=args.pretrained_21k,
             num_registers=args.num_registers,
-            use_norm_layer=False,
         )
 
     else:
