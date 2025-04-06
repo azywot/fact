@@ -285,6 +285,7 @@ def main(args):
             img_size=args.input_size,
             pretrained_21k=args.pretrained_21k,
             num_registers=args.num_registers,
+            use_norm_layer=False,
         )
 
     else:
@@ -366,9 +367,10 @@ def main(args):
         if args.segmentation: # NOTE: segmentation model (added .vit)
             for param in model.vit.patch_embed.parameters():
                 param.requires_grad = False
-                
-            for param in model.vit.norm.parameters():
-                param.requires_grad = False
+            
+            if not model.vit.use_norm_layer:
+                for param in model.vit.norm.parameters():
+                    param.requires_grad = False
 
             print(">"*20, "Froze the patch embeddings.")
             num_blocks = len(model.vit.blocks)
