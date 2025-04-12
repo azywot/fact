@@ -576,7 +576,7 @@ class DeitSegModel(nn.Module):
 
 
 class LinearHead(nn.Module):
-    def __init__(self, in_dim=1024, num_classes=150, patch_size=14, image_size=518):
+    def __init__(self, in_dim=1024, num_classes=151, patch_size=14, image_size=518):
         super().__init__()
         self.patch_size = patch_size
         self.image_size = image_size
