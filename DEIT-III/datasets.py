@@ -65,46 +65,135 @@ class INatDataset(ImageFolder):
     # __getitem__ and __len__ inherited from ImageFolder
 
 
-class ADE20KSegmentation(Dataset):
-    def __init__(self, root, is_train=True, image_size=224):
+# OLD VERSION
+# class ADE20KSegmentation(Dataset):
+#     def __init__(self, root, is_train=True, image_size=224):
 
-        super().__init__()
-        if is_train:
-            split = "training"
-        else:
-            split = "validation"
-        self.image_files = sorted(
-            glob.glob(os.path.join(root, split, "**", "*.jpg"), recursive=True)
-        )
-        self.image_size = image_size
-        self.transform = transforms.Compose(
+#         super().__init__()
+#         if is_train:
+#             split = "training"
+#         else:
+#             split = "validation"
+#         self.image_files = sorted(
+#             glob.glob(os.path.join(root, split, "**", "*.jpg"), recursive=True)
+#         )
+#         self.image_size = image_size
+#         self.transform = transforms.Compose(
+#             [
+#                 transforms.Resize((image_size, image_size)),
+#                 transforms.ToTensor(),
+#             ]
+#         )
+
+#     def __len__(self):
+#         return len(self.image_files)
+
+#     def __getitem__(self, idx):
+#         img_path = self.image_files[idx]
+#         mask_path = img_path.replace(".jpg", "_seg.png")
+
+#         image = Image.open(img_path).convert("RGB")
+#         mask = Image.open(mask_path).convert("L")
+
+#         image = self.transform(image)
+#         mask = np.array(mask)
+#         mask = Image.fromarray(mask).resize(
+#             (self.image_size, self.image_size), resample=Image.NEAREST
+#         )
+#         mask = np.array(mask).astype(np.int64)
+
+#         mask[(mask != 255) & (mask > 149)] = 149  # TODO: clarify
+#         mask = torch.from_numpy(mask)
+
+#         return image, mask
+
+
+# NEW VERSION
+class ADE20KSegmentation(Dataset):
+
+    def __init__(self, root: str, is_train: bool = True, image_size: int = 224):
+
+        self.root = root
+        self.mode = "train" if is_train else "valid"
+
+        self.image_transform = transforms.Compose(
             [
                 transforms.Resize((image_size, image_size)),
                 transforms.ToTensor(),
             ]
         )
 
+        self.get_filenames()
+
+    def get_filenames(self):
+        self.images_training_dir = os.path.join(self.root, "images", "training")
+        self.annotations_training_dir = os.path.join(
+            self.root, "annotations", "training"
+        )
+
+        self.images_validation_dir = os.path.join(self.root, "images", "validation")
+        self.annotations_validation_dir = os.path.join(
+            self.root, "annotations", "validation"
+        )
+
+        train_images = sorted(
+            [f for f in os.listdir(self.images_training_dir) if f.endswith(".jpg")]
+        )
+        train_masks = sorted(
+            [f for f in os.listdir(self.annotations_training_dir) if f.endswith(".png")]
+        )
+
+        val_images = sorted(
+            [f for f in os.listdir(self.images_validation_dir) if f.endswith(".jpg")]
+        )
+        val_masks = sorted(
+            [
+                f
+                for f in os.listdir(self.annotations_validation_dir)
+                if f.endswith(".png")
+            ]
+        )
+
+        if self.mode == "train":
+            self.images, self.masks = train_images, train_masks
+            self.images_path, self.masks_path = (
+                self.images_training_dir,
+                self.annotations_training_dir,
+            )
+        else:
+            self.images, self.masks = val_images, val_masks
+            self.images_path, self.masks_path = (
+                self.images_validation_dir,
+                self.annotations_validation_dir,
+            )
+
     def __len__(self):
-        return len(self.image_files)
+        return len(self.images)
 
     def __getitem__(self, idx):
-        img_path = self.image_files[idx]
-        mask_path = img_path.replace(".jpg", "_seg.png")
+        image_name = self.images[idx].split("/")[-1].split(".")[0]
 
-        image = Image.open(img_path).convert("RGB")
-        mask = Image.open(mask_path).convert("L")
+        image_path = os.path.join(self.images_path, f"{image_name}.jpg")
+        mask_path = os.path.join(self.masks_path, f"{image_name}.png")
 
-        image = self.transform(image)
-        mask = np.array(mask)
-        mask = Image.fromarray(mask).resize(
-            (self.image_size, self.image_size), resample=Image.NEAREST
+        # Load image and apply transform
+        image = Image.open(image_path).convert("RGB")
+        image = self.image_transform(image)
+
+        # Load and resize mask without normalization
+        mask = Image.open(mask_path)
+        mask = mask.resize(
+            (self.resize_width, self.resize_height), resample=Image.NEAREST
         )
-        mask = np.array(mask).astype(np.int64)
-
-        mask[(mask != 255) & (mask > 149)] = 149  # TODO: clarify
-        mask = torch.from_numpy(mask)
-
+        mask = torch.from_numpy(np.array(mask)).long()  # shape: [H, W]
         return image, mask
+
+        # return {
+        #     "image": image,
+        #     "mask": mask,
+        #     "image_filepath": image_path,
+        #     "mask_filepath": mask_path,
+        # }
 
 
 def build_dataset(is_train, args):
