@@ -115,10 +115,11 @@ class ADE20KSegmentation(Dataset):
 
         self.root = root
         self.mode = "train" if is_train else "valid"
+        self.image_size = image_size
 
         self.image_transform = transforms.Compose(
             [
-                transforms.Resize((image_size, image_size)),
+                transforms.Resize((self.image_size, self.image_size)),
                 transforms.ToTensor(),
             ]
         )
@@ -182,9 +183,7 @@ class ADE20KSegmentation(Dataset):
 
         # Load and resize mask without normalization
         mask = Image.open(mask_path)
-        mask = mask.resize(
-            (self.resize_width, self.resize_height), resample=Image.NEAREST
-        )
+        mask = mask.resize((self.image_size, self.image_size), resample=Image.NEAREST)
         mask = torch.from_numpy(np.array(mask)).long()  # shape: [H, W]
         return image, mask
 
